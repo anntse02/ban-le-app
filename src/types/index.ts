@@ -6,7 +6,26 @@ export type BagType = "25kg" | "50kg" | "Khác" | string;
 export interface ProductItem {
   id: string;
   name: string;
-  price: number;
+  price: number; // Giá gốc bao 50kg
+  allow25kg?: boolean; // Cho phép bán bao 25kg (mặc định true)
+  allow50kg?: boolean; // Cho phép bán bao 50kg (mặc định true)
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  createdAt: number;
+}
+
+export interface PickupEvent {
+  id: string;
+  date: string;       // YYYY-MM-DD (Giờ VN)
+  time: string;       // HH:mm:ss (Giờ VN)
+  quantity: number;   // Số bao lấy trong lần này
+  note?: string;      // Ghi chú lần lấy
+  createdAt: number;  // Timestamp
 }
 
 export interface SaleRecord {
@@ -17,7 +36,7 @@ export interface SaleRecord {
   customerName?: string;     // Tên khách hàng
   itemName: string;          // Tên hàng hóa
   bagType?: string;          // Loại bao (25kg / 50kg)
-  quantity: number;          // Số lượng bao
+  quantity: number;          // Tổng số lượng bao đã mua
   unitPrice: number;         // Đơn giá (VNĐ)
   totalPrice: number;        // Thành tiền (VNĐ)
   paymentStatus?: PaymentStatus; // "paid" (Đã thu) | "unpaid" (Chưa thu)
@@ -27,6 +46,13 @@ export interface SaleRecord {
   isDeleted?: boolean;       // Trạng thái đã xóa
   deleteReason?: string;     // Lý do xóa
   deletedAt?: number;        // Timestamp thời điểm xóa
+
+  // Tính năng Khách mua 1 đơn lấy hàng nhiều lần (Đơn gửi kho)
+  isPartialPickup?: boolean; // true nếu là đơn lấy nhiều lần
+  pickupStatus?: "pending" | "completed"; // "pending": Chưa lấy hết | "completed": Đã lấy đủ
+  pickedQuantity?: number;   // Tổng số bao đã lấy cho đến hiện tại
+  pickupHistory?: PickupEvent[]; // Danh sách các lần lấy hàng chi tiết
+  completedAt?: number;      // Thời điểm hoàn tất lấy đủ số lượng
 }
 
 export interface ReportFilter {

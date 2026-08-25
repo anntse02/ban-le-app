@@ -600,6 +600,20 @@ export default function SalesTable({
                           {formatNumberVN(rec.unitPrice)} đ/bao
                         </p>
 
+                        {rec.isPartialPickup && (
+                          <div className="pt-0.5">
+                            {rec.pickupStatus === "completed" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                                📦 Đã lấy đủ ({rec.pickedQuantity || rec.quantity}/{rec.quantity} bao)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                ⏳ Đang gửi kho (Đã lấy: {rec.pickedQuantity || 0}/{rec.quantity} bao)
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {rec.note && (
                           <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 inline-block">
                             📝 {rec.note}

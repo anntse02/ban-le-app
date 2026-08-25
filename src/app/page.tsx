@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { SaleRecord } from "@/types";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { SaleRecord, PickupEvent } from "@/types";
 import SalesForm from "@/components/SalesForm";
 import SalesTable from "@/components/SalesTable";
+import PartialPickupsTab from "@/components/PartialPickupsTab";
 import ExportModal from "@/components/ExportModal";
-import { getVietnamDate, getVietnamTodayDisplay } from "@/lib/dateUtils";
+import { getVietnamDate, getVietnamTime, getVietnamTodayDisplay } from "@/lib/dateUtils";
 import { formatCurrencyVND } from "@/lib/formatters";
-import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { db, isFirebaseConfigured, sanitizeForFirestore } from "@/lib/firebase";
 import {
   collection,
   addDoc,
+  setDoc,
   updateDoc,
   doc,
   onSnapshot,
@@ -24,12 +26,13 @@ import {
   PlusCircle,
   ClipboardList,
   Sparkles,
+  Layers,
 } from "lucide-react";
 
 export default function HomePage() {
   const today = getVietnamDate();
 
-  const [activeTab, setActiveTab] = useState<"form" | "table">("form");
+  const [activeTab, setActiveTab] = useState<"form" | "table" | "pickups">("form");
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -37,21 +40,25 @@ export default function HomePage() {
 
   // Bộ nhớ đệm lưu đơn hàng theo từng ngày: Record<"YYYY-MM-DD", SaleRecord[]>
   const [dateRecordsMap, setDateRecordsMap] = useState<Record<string, SaleRecord[]>>({});
+  // Danh sách các đơn lấy nhiều lần (đang lưu giữ / gửi kho)
+  const [partialRecords, setPartialRecords] = useState<SaleRecord[]>([]);
   // Danh sách các ngày đã tải từ Firestore để tránh đọc lại
   const [loadedDates, setLoadedDates] = useState<Set<string>>(new Set());
 
-  // 1. CHỈ LẮNG NGHE ĐƠN HÀNG CỦA HÔM NAY (Realtime - Tiết kiệm tối đa lượt đọc Firestore)
+  // 1. LẮNG NGHE ĐƠN HÀNG HÔM NAY & CÁC ĐƠN LẤY NHIỀU LẦN ĐANG DỞ
   useEffect(() => {
-    let unsubscribe = () => {};
+    let unsubscribeToday = () => {};
+    let unsubscribePartials = () => {};
 
     if (isFirebaseConfigured() && db) {
       try {
+        // Lắng nghe đơn hôm nay
         const todayQuery = query(
           collection(db, "sales"),
           where("date", "==", today)
         );
 
-        unsubscribe = onSnapshot(
+        unsubscribeToday = onSnapshot(
           todayQuery,
           (snapshot) => {
             const todayData: SaleRecord[] = [];
@@ -72,8 +79,32 @@ export default function HomePage() {
             setIsFirebaseConnected(true);
           },
           (err) => {
-            console.warn("Firestore error, fallback local storage:", err);
+            console.warn("Firestore listener error, fallback local storage:", err);
             loadFromLocalStorage();
+          }
+        );
+
+        // Lắng nghe các đơn lấy nhiều lần
+        const partialsQuery = query(
+          collection(db, "sales"),
+          where("isPartialPickup", "==", true)
+        );
+
+        unsubscribePartials = onSnapshot(
+          partialsQuery,
+          (snapshot) => {
+            const pData: SaleRecord[] = [];
+            snapshot.forEach((docSnap) => {
+              pData.push({
+                id: docSnap.id,
+                ...(docSnap.data() as Omit<SaleRecord, "id">),
+              });
+            });
+            pData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            setPartialRecords(pData);
+          },
+          (err) => {
+            console.warn("Firestore partials listener error:", err);
           }
         );
       } catch (e) {
@@ -83,7 +114,10 @@ export default function HomePage() {
       loadFromLocalStorage();
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeToday();
+      unsubscribePartials();
+    };
   }, [today]);
 
   const loadFromLocalStorage = () => {
@@ -99,6 +133,7 @@ export default function HomePage() {
             map[r.date].push(r);
           });
           setDateRecordsMap(map);
+          setPartialRecords(all.filter((r) => r.isPartialPickup));
         } catch (e) {
           console.error("Lỗi đọc localStorage", e);
         }
@@ -169,13 +204,16 @@ export default function HomePage() {
 
     try {
       if (isFirebaseConfigured() && db) {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout")), 3000)
-        );
-        await Promise.race([
-          addDoc(collection(db, "sales"), recordWithTime),
-          timeoutPromise,
-        ]);
+        try {
+          const newDocRef = doc(collection(db, "sales"));
+          recordWithTime.id = newDocRef.id;
+          // Ghi lên Firebase Realtime an toàn
+          setDoc(newDocRef, sanitizeForFirestore(recordWithTime)).catch((err) => {
+            console.warn("Lỗi đồng bộ Firebase:", err);
+          });
+        } catch (fbErr) {
+          console.warn("Lỗi khởi tạo docRef Firestore:", fbErr);
+        }
       }
 
       setDateRecordsMap((prev) => {
@@ -185,10 +223,15 @@ export default function HomePage() {
           [newRecord.date]: [recordWithTime, ...currentList],
         };
       });
+
+      if (newRecord.isPartialPickup) {
+        setPartialRecords((prev) => [recordWithTime, ...prev.filter((r) => r.id !== recordWithTime.id)]);
+      }
+
       saveToLocal(recordWithTime);
       setSelectedDate(newRecord.date);
     } catch (err: any) {
-      console.warn("Lỗi lưu Firebase, chuyển sang lưu Local:", err);
+      console.warn("Lỗi lưu đơn hàng:", err);
       setDateRecordsMap((prev) => {
         const currentList = prev[newRecord.date] || [];
         return {
@@ -196,13 +239,97 @@ export default function HomePage() {
           [newRecord.date]: [recordWithTime, ...currentList],
         };
       });
+      if (newRecord.isPartialPickup) {
+        setPartialRecords((prev) => [recordWithTime, ...prev.filter((r) => r.id !== recordWithTime.id)]);
+      }
       saveToLocal(recordWithTime);
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. XÓA GIAO DỊCH KÈM LÝ DO (Soft Delete)
+  // 4. XỬ LÝ LẤY HÀNG NHIỀU LẦN (Thao tác lấy hàng của từng lần)
+  const handleAddPickup = async (recordId: string, pickupQuantity: number, pickupNote?: string) => {
+    const autoDate = getVietnamDate();
+    const autoTime = getVietnamTime();
+
+    const newEvent: PickupEvent = {
+      id: "pick_" + Date.now(),
+      date: autoDate,
+      time: autoTime,
+      quantity: pickupQuantity,
+      note: pickupNote || "",
+      createdAt: Date.now(),
+    };
+
+    let updatedTargetRecord: SaleRecord | null = null;
+
+    // Cập nhật state partialRecords
+    setPartialRecords((prev) => {
+      return prev.map((r) => {
+        if (r.id === recordId) {
+          const currentPicked = Number(r.pickedQuantity) || 0;
+          const newPicked = currentPicked + pickupQuantity;
+          const isDone = newPicked >= (Number(r.quantity) || 0);
+          const history = r.pickupHistory ? [...r.pickupHistory, newEvent] : [newEvent];
+
+          const updated: SaleRecord = {
+            ...r,
+            pickedQuantity: newPicked,
+            pickupStatus: isDone ? "completed" : "pending",
+            pickupHistory: history,
+            ...(isDone ? { completedAt: Date.now() } : (r.completedAt ? { completedAt: r.completedAt } : {})),
+          };
+          updatedTargetRecord = updated;
+          return updated;
+        }
+        return r;
+      });
+    });
+
+    // Cập nhật trong dateRecordsMap (sổ đơn hàng)
+    if (updatedTargetRecord) {
+      const rec = updatedTargetRecord as SaleRecord;
+      setDateRecordsMap((prev) => {
+        const list = prev[rec.date] || [];
+        return {
+          ...prev,
+          [rec.date]: list.map((item) => (item.id === recordId ? rec : item)),
+        };
+      });
+      saveToLocal(rec);
+    }
+
+    // Cập nhật Firebase
+    if (isFirebaseConfigured() && db) {
+      try {
+        const found = partialRecords.find((r) => r.id === recordId);
+        if (found) {
+          const currentPicked = Number(found.pickedQuantity) || 0;
+          const newPicked = currentPicked + pickupQuantity;
+          const isDone = newPicked >= (Number(found.quantity) || 0);
+          const history = found.pickupHistory ? [...found.pickupHistory, newEvent] : [newEvent];
+
+          const updatePayload: any = {
+            pickedQuantity: newPicked,
+            pickupStatus: isDone ? "completed" : "pending",
+            pickupHistory: history,
+          };
+          if (isDone) {
+            updatePayload.completedAt = Date.now();
+          } else if (found.completedAt) {
+            updatePayload.completedAt = found.completedAt;
+          }
+
+          await updateDoc(doc(db, "sales", recordId), sanitizeForFirestore(updatePayload));
+        }
+      } catch (err) {
+        console.warn("Lỗi cập nhật pickup Firestore:", err);
+      }
+    }
+  };
+
+  // 5. XÓA GIAO DỊCH KÈM LÝ DO (Soft Delete)
   const handleDeleteRecord = async (id: string, reason: string) => {
     const targetDate = selectedDate;
     setDateRecordsMap((prev) => {
@@ -224,20 +351,24 @@ export default function HomePage() {
       };
     });
 
+    setPartialRecords((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, isDeleted: true, deleteReason: reason, deletedAt: Date.now() } : r))
+    );
+
     if (isFirebaseConfigured() && db) {
       try {
-        await updateDoc(doc(db, "sales", id), {
+        await updateDoc(doc(db, "sales", id), sanitizeForFirestore({
           isDeleted: true,
           deleteReason: reason,
           deletedAt: Date.now(),
-        });
+        }));
       } catch (err: any) {
         console.warn("Lỗi update Firebase:", err);
       }
     }
   };
 
-  // 5. TẢI DỮ LIỆU ĐỂ XUẤT EXCEL
+  // 6. TẢI DỮ LIỆU ĐỂ XUẤT EXCEL
   const handleFetchExportRecords = useCallback(
     async (
       mode: "range" | "multiday",
@@ -295,8 +426,16 @@ export default function HomePage() {
     [dateRecordsMap]
   );
 
-  // Thống kê hôm nay
-  const todayRecords = dateRecordsMap[today] || [];
+  // Điều kiện để một đơn xuất hiện trong Sổ Đơn Hàng:
+  // 1. Là đơn bán bình thường (!isPartialPickup)
+  // 2. HOẶC là đơn lấy nhiều lần nhưng ĐÃ LẤY ĐỦ HẾT (pickupStatus === "completed")
+  const isRecordInSalesBook = (r: SaleRecord) => {
+    if (!r.isPartialPickup) return true;
+    return r.pickupStatus === "completed";
+  };
+
+  // Thống kê hôm nay (chỉ tính đơn bán thường và đơn đã lấy đủ)
+  const todayRecords = (dateRecordsMap[today] || []).filter(isRecordInSalesBook);
   const todayActiveRecords = todayRecords.filter((r) => !r.isDeleted);
   const todayRevenue = todayActiveRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
   const todayBao25 = todayActiveRecords
@@ -306,7 +445,12 @@ export default function HomePage() {
     .filter((r) => r.bagType === "50kg")
     .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 
-  const currentViewRecords = dateRecordsMap[selectedDate] || [];
+  // Đếm số đơn đang gửi kho / lấy dở
+  const pendingPickupsCount = partialRecords.filter(
+    (r) => r.isPartialPickup && r.pickupStatus !== "completed" && !r.isDeleted
+  ).length;
+
+  const currentViewRecords = (dateRecordsMap[selectedDate] || []).filter(isRecordInSalesBook);
   const formatVND = (num: number) => formatCurrencyVND(num);
 
   return (
@@ -352,44 +496,61 @@ export default function HomePage() {
 
       {/* Main Container */}
       <div className="max-w-2xl mx-auto px-2.5 sm:px-4 pt-2 space-y-2">
-        {/* THANH CHỌN THẺ NẰM NGAY ĐẦU TRANG (DƯỚI HEADER) */}
-        <div className="grid grid-cols-2 gap-1.5 bg-slate-200/90 p-1 rounded-xl shadow-2xs">
+        {/* THANH CHỌN THẺ NẰM NGAY ĐẦU TRANG (3 THẺ GỌN ĐẸP) */}
+        <div className="grid grid-cols-3 gap-1 bg-slate-200/90 p-1 rounded-xl shadow-2xs text-[11px] font-bold">
+          {/* Tab 1: Nhập Bán */}
           <button
             type="button"
             onClick={() => setActiveTab("form")}
-            className={`py-1.5 sm:py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 sm:py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
               activeTab === "form"
                 ? "bg-white text-green-700 shadow-xs scale-[1.01]"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            <span>📝 Nhập Bán Hàng</span>
+            <span className="truncate">Nhập Bán</span>
           </button>
 
+          {/* Tab 2: Lấy Nhiều Lần (Ở GIỮA) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("pickups")}
+            className={`py-1.5 sm:py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
+              activeTab === "pickups"
+                ? "bg-white text-teal-700 shadow-xs scale-[1.01]"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span className="truncate">
+              Lấy Nhiều Lần {pendingPickupsCount > 0 && `(${pendingPickupsCount})`}
+            </span>
+          </button>
+
+          {/* Tab 3: Sổ Đơn (Ở CUỐI) */}
           <button
             type="button"
             onClick={() => setActiveTab("table")}
-            className={`py-1.5 sm:py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 sm:py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
               activeTab === "table"
                 ? "bg-white text-green-700 shadow-xs scale-[1.01]"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <ClipboardList className="w-3.5 h-3.5" />
-            <span>📋 Sổ Đơn Hàng ({todayActiveRecords.length})</span>
+            <span className="truncate">Sổ Đơn ({todayActiveRecords.length})</span>
           </button>
         </div>
 
         {/* NỘI DUNG THẺ */}
         {activeTab === "form" ? (
           <div>
-            {/* Thẻ Nhập Bán Hàng thiết kế siêu gọn nằm trọn trong 1 màn hình */}
             <SalesForm onAddRecord={handleAddRecord} loading={loading} />
           </div>
-        ) : (
+        ) : activeTab === "table" ? (
           <div className="space-y-2.5">
-            {/* Banner Tóm Tắt Doanh Số Hôm Nay ĐÃ ĐƯỢC CHUYỂN VÀO ĐẦU THẺ SỔ ĐƠN HÀNG */}
+            {/* Banner Tóm Tắt Doanh Số Hôm Nay */}
             <div className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl p-3 text-white shadow-xs flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-white/15 rounded-lg">
@@ -422,6 +583,15 @@ export default function HomePage() {
               onDeleteRecord={handleDeleteRecord}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
+            />
+          </div>
+        ) : (
+          <div>
+            {/* Thẻ Quản Lý Các Đơn Khách Lấy Nhiều Lần */}
+            <PartialPickupsTab
+              records={partialRecords}
+              onAddPickup={handleAddPickup}
+              onDeleteRecord={handleDeleteRecord}
             />
           </div>
         )}

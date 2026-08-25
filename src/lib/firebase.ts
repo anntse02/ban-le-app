@@ -32,4 +32,27 @@ export function isFirebaseConfigured(): boolean {
   return true;
 }
 
+/**
+ * Loại bỏ 100% các giá trị `undefined` trước khi gửi lên Firestore
+ * (Firestore cấm tuyệt đối giá trị `undefined` trong document)
+ */
+export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => (typeof item === "object" ? sanitizeForFirestore(item) : item));
+  }
+  const cleaned: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      if (val !== null && typeof val === "object" && !(val instanceof Date)) {
+        cleaned[key] = sanitizeForFirestore(val);
+      } else {
+        cleaned[key] = val;
+      }
+    }
+  }
+  return cleaned;
+}
+
 export { app, db };
