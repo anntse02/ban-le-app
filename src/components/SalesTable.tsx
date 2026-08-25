@@ -36,7 +36,7 @@ interface ItemSummary {
   totalRevenue: number;
 }
 
-type FilterTab = "all" | "Hằng" | "Gấm" | "paid" | "unpaid";
+type FilterTab = "all" | "Hằng" | "Gấm" | "paid" | "unpaid" | "partial";
 
 export default function SalesTable({
   records,
@@ -59,11 +59,12 @@ export default function SalesTable({
 
   const todayStr = getVietnamDate();
 
-  // Đếm theo người bán và trạng thái thu tiền
+  // Đếm theo người bán, trạng thái thu tiền và đơn lấy nhiều lần
   const countHang = records.filter((r) => r.seller === "Hằng" && !r.isDeleted).length;
   const countGam = records.filter((r) => r.seller === "Gấm" && !r.isDeleted).length;
   const countPaid = records.filter((r) => r.paymentStatus !== "unpaid" && !r.isDeleted).length;
   const countUnpaid = records.filter((r) => r.paymentStatus === "unpaid" && !r.isDeleted).length;
+  const countPartial = records.filter((r) => r.isPartialPickup && !r.isDeleted).length;
 
   // Lọc theo bộ lọc và từ khóa tìm kiếm
   const filteredRecords = records.filter((rec) => {
@@ -72,6 +73,7 @@ export default function SalesTable({
     else if (activeFilter === "Gấm") matchesFilter = rec.seller === "Gấm";
     else if (activeFilter === "paid") matchesFilter = rec.paymentStatus !== "unpaid";
     else if (activeFilter === "unpaid") matchesFilter = rec.paymentStatus === "unpaid";
+    else if (activeFilter === "partial") matchesFilter = !!rec.isPartialPickup;
 
     const matchesSearch =
       rec.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -308,6 +310,20 @@ export default function SalesTable({
               <span>✗ Chưa thu</span>
               <span className="font-bold">({countUnpaid})</span>
             </button>
+
+            {/* Nút LẤY NHIỀU LẦN */}
+            <button
+              type="button"
+              onClick={() => setActiveFilter("partial")}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1 shrink-0 ${
+                activeFilter === "partial"
+                  ? "bg-amber-600 text-white shadow-2xs"
+                  : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+              }`}
+            >
+              <span>📦 Lấy nhiều lần</span>
+              <span className="font-bold">({countPartial})</span>
+            </button>
           </div>
         </div>
       </div>
@@ -502,15 +518,23 @@ export default function SalesTable({
                       : "bg-white border-slate-200 hover:shadow-sm"
                   }`}
                 >
-                  {/* SỐ THỨ TỰ BÊN TRÁI */}
-                  <div
-                    className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 border mt-0.5 ${
-                      isDel
-                        ? "bg-red-100 border-red-200 text-red-700"
-                        : "bg-slate-100 border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {idx + 1}
+                  {/* SỐ THỨ TỰ BÊN TRÁI & CHẤM TRÒN ĐỎ NẾU LÀ ĐƠN LẤY NHIỀU LẦN */}
+                  <div className="flex flex-col items-center gap-1 shrink-0 mt-0.5">
+                    <div
+                      className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center border ${
+                        isDel
+                          ? "bg-red-100 border-red-200 text-red-700"
+                          : "bg-slate-100 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {idx + 1}
+                    </div>
+                    {rec.isPartialPickup && (
+                      <div
+                        className="w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-200 shadow-xs"
+                        title="Đơn khách lấy nhiều lần (Gửi kho)"
+                      />
+                    )}
                   </div>
 
                   {/* NỘI DUNG THẺ ĐƠN HÀNG */}
@@ -611,6 +635,28 @@ export default function SalesTable({
                                 ⏳ Đang gửi kho (Đã lấy: {rec.pickedQuantity || 0}/{rec.quantity} bao)
                               </span>
                             )}
+                          </div>
+                        )}
+
+                        {/* TEXT CHI TIẾT NGÀY GIỜ & SỐ LƯỢNG LẤY CỦA MỖI LẦN */}
+                        {rec.isPartialPickup && rec.pickupHistory && rec.pickupHistory.length > 0 && (
+                          <div className="mt-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                              🚚 Chi tiết các lần lấy ({rec.pickupHistory.length} lần):
+                            </span>
+                            <div className="space-y-0.5">
+                              {rec.pickupHistory.map((event, eIdx) => (
+                                <div
+                                  key={event.id || eIdx}
+                                  className="flex items-center justify-between text-[11px] text-slate-600"
+                                >
+                                  <span>
+                                    • Lần {eIdx + 1}: {formatVietnamDisplayDate(event.date)} {event.time || ""}
+                                  </span>
+                                  <strong className="text-emerald-700 font-bold">+{event.quantity} bao</strong>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 

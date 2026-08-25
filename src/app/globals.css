@@ -8,11 +8,14 @@
   --background-end-rgb: 241, 245, 249;
 }
 
-body {
+html, body {
   color: #1e293b;
   background-color: #f1f5f9;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 /* Ẩn hoàn toàn 2 mũi tên lên xuống mặc định của thẻ input number */
