@@ -58,6 +58,11 @@ export const calculateBagPrice = (basePrice50kg: number, targetBagType: string):
   return basePrice50kg;
 };
 
+export const getBasePriceKg = (basePrice50kg: number, targetBagType: string): number => {
+  const bagPrice = calculateBagPrice(basePrice50kg, targetBagType);
+  return bagPrice / (targetBagType === "25kg" ? 25 : 50);
+};
+
 export default function SalesForm({ onAddRecord, loading = false }: SalesFormProps) {
   const [seller, setSeller] = useState<string>("Hằng");
 
@@ -80,7 +85,8 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
   // Chi tiết đơn
   const [bagType, setBagType] = useState<BagType>("50kg");
   const [quantity, setQuantity] = useState<number | "">(1);
-  const [unitPrice, setUnitPrice] = useState<number | "">(INITIAL_PRODUCTS[0].price);
+  const [unitPrice, setUnitPrice] = useState<number | string>(0); 
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
   const [note, setNote] = useState<string>("");
 
@@ -123,7 +129,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                     setBagType("25kg");
                   }
 
-                  setUnitPrice(calculateBagPrice(selectedProd.price, validBag));
+                  setUnitPrice(getBasePriceKg(selectedProd.price, validBag));
                   return selectedProd.name;
                 });
 
@@ -161,7 +167,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           setSelectedItemName(first.name);
           const initialBag: BagType = first.allow50kg !== false ? "50kg" : "25kg";
           setBagType(initialBag);
-          setUnitPrice(calculateBagPrice(first.price, initialBag));
+          setUnitPrice(getBasePriceKg(first.price, initialBag));
           return;
         }
       }
@@ -227,7 +233,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
         targetBag = "25kg";
         setBagType("25kg");
       }
-      setUnitPrice(calculateBagPrice(current.price, targetBag));
+      setUnitPrice(getBasePriceKg(current.price, targetBag));
     }
   };
 
@@ -243,7 +249,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
     saveProducts(updated);
     setSelectedItemName(newItem.name);
     setBagType("50kg");
-    setUnitPrice(calculateBagPrice(newItem.price, "50kg"));
+    setUnitPrice(getBasePriceKg(newItem.price, "50kg"));
   };
 
   const handleDeleteProduct = (id: string) => {
@@ -258,7 +264,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
       setSelectedItemName(first.name);
       const initialBag: BagType = first.allow50kg !== false ? "50kg" : "25kg";
       setBagType(initialBag);
-      setUnitPrice(calculateBagPrice(first.price, initialBag));
+      setUnitPrice(getBasePriceKg(first.price, initialBag));
     }
   };
 
@@ -274,7 +280,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
         targetBag = "25kg";
         setBagType("25kg");
       }
-      setUnitPrice(calculateBagPrice(found.price, targetBag));
+      setUnitPrice(getBasePriceKg(found.price, targetBag));
     }
   };
 
@@ -285,13 +291,16 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
 
     setBagType(type);
     if (currentProduct) {
-      setUnitPrice(calculateBagPrice(currentProduct.price, type));
+      setUnitPrice(getBasePriceKg(currentProduct.price, type));
+      setIsEditingPrice(false);
     }
   };
 
   const numQty = typeof quantity === "number" ? quantity : 0;
   const numPrice = typeof unitPrice === "number" ? unitPrice : 0;
-  const totalPrice = numQty * numPrice;
+  const bagWeight = bagType === "25kg" ? 25 : 50;
+  const finalBagPrice = numPrice * bagWeight;
+  const totalPrice = numQty * finalBagPrice;
 
   // Lượng tồn kho hiện tại của loại bao đang chọn
   const currentStock = bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0);
@@ -366,7 +375,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
       itemName: selectedItemName.trim(),
       bagType,
       quantity: numQty,
-      unitPrice: numPrice,
+      unitPrice: finalBagPrice, // Lưu theo giá của 1 bao để tương thích với lịch sử
       totalPrice,
       paymentStatus,
       paymentMethod: "cash",
@@ -383,6 +392,10 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
     setNote("");
     setIsPartialPickup(false);
     setFirstPickupQty(1);
+    setIsEditingPrice(false);
+    if (currentProduct) {
+      setUnitPrice(getBasePriceKg(currentProduct.price, bagType));
+    }
 
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 2500);
@@ -714,17 +727,41 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
             </div>
           </div>
 
-          {/* Ô Đơn Giá (Tự động theo hàng & loại bao, không thể sửa trực tiếp) */}
+          {/* Ô Đơn Giá (Cho phép chỉnh sửa đơn giá/ký cho từng đơn) */}
           <div className="min-w-0">
-            <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block mb-0.5">Đơn giá / Bao (VNĐ):</span>
-            <input
-              type="text"
-              readOnly
-              tabIndex={-1}
-              value={formatCurrencyInput(unitPrice)}
-              className="w-full min-w-0 h-11 px-3 bg-slate-100 border border-slate-300 rounded-2xl text-sm sm:text-base font-black text-slate-900 cursor-not-allowed select-none outline-none"
-              title="Đơn giá tự động tính theo mặt hàng & loại bao (dùng nút Sửa giá phía trên để thay đổi)"
-            />
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block mb-0.5">Đơn giá / Ký (VNĐ):</span>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                readOnly={!isEditingPrice}
+                tabIndex={isEditingPrice ? 0 : -1}
+                value={unitPrice === "" ? "" : formatCurrencyInput(unitPrice)}
+                onChange={(e) => {
+                  if (isEditingPrice) {
+                    setUnitPrice(parseQuantityInput(e.target.value));
+                  }
+                }}
+                className={`w-full min-w-0 h-11 pl-3 pr-20 rounded-2xl text-sm sm:text-base font-black outline-none transition ${
+                  isEditingPrice 
+                    ? "bg-white border border-blue-400 focus:ring-1 focus:ring-blue-500 text-blue-900 shadow-2xs" 
+                    : "bg-slate-100 border border-slate-300 text-slate-900 cursor-not-allowed select-none"
+                }`}
+                title={isEditingPrice ? "Nhập đơn giá mới tính theo Ký" : "Đơn giá / Ký (Bấm 'Sửa giá' để thay đổi)"}
+              />
+              <button 
+                type="button" 
+                onClick={() => setIsEditingPrice(!isEditingPrice)}
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition active:scale-95 ${
+                  isEditingPrice 
+                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200" 
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-xs"
+                }`}
+                title="Thay đổi giá bán / kg cho riêng đơn này"
+              >
+                {isEditingPrice ? "Lưu tạm" : "Sửa giá"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -813,7 +850,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
 
           {numQty > 0 && numPrice > 0 && (
             <span className="text-[10px] sm:text-[11px] font-bold text-green-800/80 bg-white/80 px-2 py-0.5 rounded-lg border border-green-200 shrink-0 ml-1">
-              {numQty} bao × {formatNumberVN(numPrice)} đ
+              {numQty * bagWeight} kg × {formatNumberVN(numPrice)} đ/kg
             </span>
           )}
         </div>
