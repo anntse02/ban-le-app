@@ -32,17 +32,17 @@ interface SalesFormProps {
 }
 
 const INITIAL_PRODUCTS: ProductItem[] = [
-  { id: "p1", name: "Cám lợn (heo)", price: 380000, allow25kg: true, allow50kg: true },
-  { id: "p2", name: "Cám gà / vịt", price: 350000, allow25kg: true, allow50kg: true },
-  { id: "p3", name: "Cám bò / dê", price: 290000, allow25kg: true, allow50kg: true },
-  { id: "p4", name: "Gạo ST25", price: 420000, allow25kg: true, allow50kg: true },
-  { id: "p5", name: "Gạo Đài Thơm", price: 360000, allow25kg: true, allow50kg: true },
-  { id: "p6", name: "Gạo Bắc Hương", price: 340000, allow25kg: true, allow50kg: true },
-  { id: "p7", name: "Phân bón NPK", price: 450000, allow25kg: true, allow50kg: true },
-  { id: "p8", name: "Đạm Ure", price: 390000, allow25kg: true, allow50kg: true },
-  { id: "p9", name: "Phân Lân / Kali", price: 310000, allow25kg: true, allow50kg: true },
-  { id: "p10", name: "Ngô hạt / Bột ngô", price: 280000, allow25kg: true, allow50kg: true },
-  { id: "p11", name: "Đường cát trắng", price: 520000, allow25kg: true, allow50kg: true },
+  { id: "p1", name: "Cám lợn (heo)", price: 380000, allow25kg: true, allow50kg: true, stock25kg: 25, stock50kg: 40, minStockAlert: 5 },
+  { id: "p2", name: "Cám gà / vịt", price: 350000, allow25kg: true, allow50kg: true, stock25kg: 18, stock50kg: 32, minStockAlert: 5 },
+  { id: "p3", name: "Cám bò / dê", price: 290000, allow25kg: true, allow50kg: true, stock25kg: 10, stock50kg: 20, minStockAlert: 5 },
+  { id: "p4", name: "Gạo ST25", price: 420000, allow25kg: true, allow50kg: true, stock25kg: 30, stock50kg: 50, minStockAlert: 5 },
+  { id: "p5", name: "Gạo Đài Thơm", price: 360000, allow25kg: true, allow50kg: true, stock25kg: 20, stock50kg: 35, minStockAlert: 5 },
+  { id: "p6", name: "Gạo Bắc Hương", price: 340000, allow25kg: true, allow50kg: true, stock25kg: 15, stock50kg: 25, minStockAlert: 5 },
+  { id: "p7", name: "Phân bón NPK", price: 450000, allow25kg: true, allow50kg: true, stock25kg: 12, stock50kg: 28, minStockAlert: 5 },
+  { id: "p8", name: "Đạm Ure", price: 390000, allow25kg: true, allow50kg: true, stock25kg: 14, stock50kg: 22, minStockAlert: 5 },
+  { id: "p9", name: "Phân Lân / Kali", price: 310000, allow25kg: true, allow50kg: true, stock25kg: 8, stock50kg: 18, minStockAlert: 5 },
+  { id: "p10", name: "Ngô hạt / Bột ngô", price: 280000, allow25kg: true, allow50kg: true, stock25kg: 16, stock50kg: 30, minStockAlert: 5 },
+  { id: "p11", name: "Đường cát trắng", price: 520000, allow25kg: true, allow50kg: true, stock25kg: 10, stock50kg: 15, minStockAlert: 5 },
 ];
 
 /**
@@ -72,6 +72,10 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
   const [isProductManagerOpen, setIsProductManagerOpen] = useState<boolean>(false);
   const [deletingProduct, setDeletingProduct] = useState<ProductItem | null>(null);
   const [selectedItemName, setSelectedItemName] = useState<string>(INITIAL_PRODUCTS[0].name);
+
+  // Drag and Drop State
+  const [draggedProductId, setDraggedProductId] = useState<string | null>(null);
+  const [dragOverProductId, setDragOverProductId] = useState<string | null>(null);
 
   // Chi tiết đơn
   const [bagType, setBagType] = useState<BagType>("50kg");
@@ -289,6 +293,10 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
   const numPrice = typeof unitPrice === "number" ? unitPrice : 0;
   const totalPrice = numQty * numPrice;
 
+  // Lượng tồn kho hiện tại của loại bao đang chọn
+  const currentStock = bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0);
+  const isOutOfStock = currentStock < 1;
+
   // Xác định tên khách cuối cùng
   const finalCustomerName = isRetail
     ? "Khách lẻ"
@@ -310,6 +318,13 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
     }
     if (numPrice <= 0) {
       alert("Vui lòng nhập đơn giá hợp lệ!");
+      return;
+    }
+
+    const currentStock = bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0);
+    const qtyTakenNow = isPartialPickup ? Math.min(numQty, Math.max(0, firstPickupQty)) : numQty;
+    if (qtyTakenNow > currentStock) {
+      alert(`Số lượng lấy ngay (${qtyTakenNow} bao) không được vượt quá số lượng tồn kho hiện có (${currentStock} bao)!`);
       return;
     }
 
@@ -395,21 +410,21 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3">
-        {/* 1. NGƯỜI BÁN (HẰNG / GẤM) */}
+        {/* 1. NGƯỜI BÁN (HẰNG / GẤM / DUYÊN) */}
         <div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {/* Nút Hằng */}
             <button
               type="button"
               onClick={() => setSeller("Hằng")}
-              className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
+              className={`flex items-center gap-1.5 p-2 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
                 seller === "Hằng"
                   ? "bg-pink-50 border-pink-500 ring-1 ring-pink-400/30 shadow-2xs"
                   : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 opacity-75"
               }`}
             >
               <div
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base font-bold shrink-0 ${
                   seller === "Hằng"
                     ? "bg-gradient-to-tr from-pink-500 to-rose-400 text-white shadow-2xs"
                     : "bg-slate-200 text-slate-600"
@@ -422,9 +437,9 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                   <span className={`font-black text-xs sm:text-sm truncate ${seller === "Hằng" ? "text-pink-900" : "text-slate-700"}`}>
                     Hằng
                   </span>
-                  {seller === "Hằng" && <CheckCircle2 className="w-4 h-4 text-pink-600 shrink-0" />}
+                  {seller === "Hằng" && <CheckCircle2 className="w-3.5 h-3.5 text-pink-600 shrink-0" />}
                 </div>
-                <span className="text-[10px] text-slate-400 font-medium">Bán hàng</span>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">Bán hàng</span>
               </div>
             </button>
 
@@ -432,14 +447,14 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
             <button
               type="button"
               onClick={() => setSeller("Gấm")}
-              className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
+              className={`flex items-center gap-1.5 p-2 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
                 seller === "Gấm"
                   ? "bg-purple-50 border-purple-500 ring-1 ring-purple-400/30 shadow-2xs"
                   : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 opacity-75"
               }`}
             >
               <div
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base font-bold shrink-0 ${
                   seller === "Gấm"
                     ? "bg-gradient-to-tr from-purple-500 to-indigo-400 text-white shadow-2xs"
                     : "bg-slate-200 text-slate-600"
@@ -452,9 +467,39 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                   <span className={`font-black text-xs sm:text-sm truncate ${seller === "Gấm" ? "text-purple-900" : "text-slate-700"}`}>
                     Gấm
                   </span>
-                  {seller === "Gấm" && <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0" />}
+                  {seller === "Gấm" && <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />}
                 </div>
-                <span className="text-[10px] text-slate-400 font-medium">Bán hàng</span>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">Bán hàng</span>
+              </div>
+            </button>
+
+            {/* Nút Duyên */}
+            <button
+              type="button"
+              onClick={() => setSeller("Duyên")}
+              className={`flex items-center gap-1.5 p-2 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
+                seller === "Duyên"
+                  ? "bg-amber-50 border-amber-500 ring-1 ring-amber-400/30 shadow-2xs"
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 opacity-75"
+              }`}
+            >
+              <div
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base font-bold shrink-0 ${
+                  seller === "Duyên"
+                    ? "bg-gradient-to-tr from-amber-500 to-orange-400 text-white shadow-2xs"
+                    : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                👩‍🦰
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className={`font-black text-xs sm:text-sm truncate ${seller === "Duyên" ? "text-amber-900" : "text-slate-700"}`}>
+                    Duyên
+                  </span>
+                  {seller === "Duyên" && <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                </div>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">Bán hàng</span>
               </div>
             </button>
           </div>
@@ -563,14 +608,14 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           </div>
         </div>
 
-        {/* 4. LOẠI BAO TRỌNG LƯỢNG */}
+        {/* 4. LOẠI BAO TRỌNG LƯỢNG (HIỆN RÕ SỐ LƯỢNG TỒN KHO) */}
         <div className="grid grid-cols-2 gap-2">
           {/* Nút Bao 25kg */}
           <button
             type="button"
             disabled={!isAllow25kg}
             onClick={() => handleSelectBagType("25kg")}
-            className={`py-2.5 px-2 rounded-2xl border-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all min-w-0 ${
+            className={`py-2 px-2 rounded-2xl border-2 font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 transition-all min-w-0 ${
               !isAllow25kg
                 ? "bg-slate-100/70 border-slate-200 text-slate-300 opacity-40 cursor-not-allowed"
                 : bagType === "25kg"
@@ -578,10 +623,17 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                 : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 active:scale-[0.98]"
             }`}
           >
-            <span>📦</span>
-            <span className="truncate">Bao 25 kg</span>
-            {isAllow25kg && bagType === "25kg" && (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="flex items-center gap-1">
+              <span>📦</span>
+              <span className="truncate">Bao 25 kg</span>
+              {isAllow25kg && bagType === "25kg" && (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              )}
+            </div>
+            {isAllow25kg && (
+              <span className={`text-[10px] font-bold ${(currentProduct?.stock25kg ?? 0) <= 0 ? "text-red-500" : "text-emerald-700"}`}>
+                Tồn: {currentProduct?.stock25kg ?? 0} bao
+              </span>
             )}
           </button>
 
@@ -590,7 +642,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
             type="button"
             disabled={!isAllow50kg}
             onClick={() => handleSelectBagType("50kg")}
-            className={`py-2.5 px-2 rounded-2xl border-2 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all min-w-0 ${
+            className={`py-2 px-2 rounded-2xl border-2 font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-0.5 transition-all min-w-0 ${
               !isAllow50kg
                 ? "bg-slate-100/70 border-slate-200 text-slate-300 opacity-40 cursor-not-allowed"
                 : bagType === "50kg"
@@ -598,10 +650,17 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                 : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 active:scale-[0.98]"
             }`}
           >
-            <span>📦</span>
-            <span className="truncate">Bao 50 kg</span>
-            {isAllow50kg && bagType === "50kg" && (
-              <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+            <div className="flex items-center gap-1">
+              <span>📦</span>
+              <span className="truncate">Bao 50 kg</span>
+              {isAllow50kg && bagType === "50kg" && (
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              )}
+            </div>
+            {isAllow50kg && (
+              <span className={`text-[10px] font-bold ${(currentProduct?.stock50kg ?? 0) <= 0 ? "text-red-500" : "text-teal-700"}`}>
+                Tồn: {currentProduct?.stock50kg ?? 0} bao
+              </span>
             )}
           </button>
         </div>
@@ -610,7 +669,12 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
         <div className="grid grid-cols-2 gap-2">
           {/* Cụm nút Số Lượng (Tự động xóa số 0 đầu: VD 05 -> 5) */}
           <div className="min-w-0">
-            <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block mb-0.5">Số lượng (Bao):</span>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-600">Số lượng (Bao):</span>
+              <span className={`text-[10px] font-bold ${(bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0)) <= 0 ? "text-red-600" : "text-emerald-700"}`}>
+                Còn: {bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0)} bao
+              </span>
+            </div>
             <div className="flex items-stretch h-11 rounded-2xl overflow-hidden border border-slate-300 min-w-0">
               <button
                 type="button"
@@ -623,31 +687,43 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                 type="text"
                 inputMode="numeric"
                 value={quantity === "" ? "" : quantity}
-                onChange={(e) => setQuantity(parseQuantityInput(e.target.value))}
+                onChange={(e) => {
+                  const val = parseQuantityInput(e.target.value);
+                  const maxAllowed = Math.floor(currentStock);
+                  if (typeof val === "number" && val > maxAllowed) {
+                    setQuantity(maxAllowed);
+                  } else {
+                    setQuantity(val);
+                  }
+                }}
                 className="w-full min-w-0 bg-slate-50 text-base font-black text-center text-slate-900 focus:bg-white focus:outline-none transition"
                 required
               />
               <button
                 type="button"
-                onClick={() => setQuantity((prev) => (Number(prev) || 0) + 1)}
-                className="w-10 sm:w-11 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-black text-xl flex items-center justify-center select-none transition active:scale-95 border-l border-slate-300 shrink-0"
+                disabled={numQty + 1 > Math.floor(currentStock)}
+                onClick={() => setQuantity((prev) => Math.min(Math.floor(currentStock), (Number(prev) || 0) + 1))}
+                className={`w-10 sm:w-11 font-black text-xl flex items-center justify-center select-none transition border-l border-slate-300 shrink-0 ${
+                  numQty + 1 > Math.floor(currentStock)
+                    ? "bg-slate-50 text-slate-300 cursor-not-allowed"
+                    : "bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 active:scale-95"
+                }`}
               >
                 +
               </button>
             </div>
           </div>
 
-          {/* Ô Đơn Giá (Có dấu chấm ngăn cách hàng nghìn/triệu) */}
+          {/* Ô Đơn Giá (Tự động theo hàng & loại bao, không thể sửa trực tiếp) */}
           <div className="min-w-0">
             <span className="text-[10px] sm:text-[11px] font-bold text-slate-600 block mb-0.5">Đơn giá / Bao (VNĐ):</span>
             <input
               type="text"
-              inputMode="numeric"
-              placeholder="380.000"
+              readOnly
+              tabIndex={-1}
               value={formatCurrencyInput(unitPrice)}
-              onChange={(e) => setUnitPrice(parseCurrencyInput(e.target.value))}
-              className="w-full min-w-0 h-11 px-3 bg-slate-50 border border-slate-300 rounded-2xl text-sm sm:text-base font-black text-slate-900 focus:bg-white focus:ring-1 focus:ring-green-500 outline-none transition"
-              required
+              className="w-full min-w-0 h-11 px-3 bg-slate-100 border border-slate-300 rounded-2xl text-sm sm:text-base font-black text-slate-900 cursor-not-allowed select-none outline-none"
+              title="Đơn giá tự động tính theo mặt hàng & loại bao (dùng nút Sửa giá phía trên để thay đổi)"
             />
           </div>
         </div>
@@ -753,14 +829,23 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           />
         </div>
 
-        {/* 10. NÚT BÁN HÀNG TO RÕ */}
+        {/* 10. NÚT BÁN HÀNG TO RÕ (TỒN 0 BAO SẼ CHUYỂN ĐỎ VÀ LÀM MỜ) */}
         <button
           type="submit"
-          disabled={loading}
-          className="w-full h-12 sm:h-13 bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white text-sm sm:text-base font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          disabled={loading || isOutOfStock}
+          className={`w-full h-12 sm:h-13 font-black rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 ${
+            isOutOfStock
+              ? "bg-red-500 text-white cursor-not-allowed opacity-60 shadow-none select-none"
+              : "bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white hover:shadow-lg disabled:opacity-50"
+          }`}
         >
           {loading ? (
             <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : isOutOfStock ? (
+            <span className="text-sm sm:text-base tracking-wide flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>HẾT HÀNG (TỒN: 0 BAO)</span>
+            </span>
           ) : (
             <span>BÁN HÀNG</span>
           )}
@@ -798,7 +883,53 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
               {products.map((p) => (
                 <div
                   key={p.id}
-                  className="p-2.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs shadow-2xs space-y-2"
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedProductId(p.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault(); // Bắt buộc để cho phép thả (drop)
+                    if (dragOverProductId !== p.id) {
+                      setDragOverProductId(p.id);
+                    }
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverProductId === p.id) {
+                      setDragOverProductId(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggedProductId && draggedProductId !== p.id) {
+                      // Hoán đổi vị trí 2 mặt hàng
+                      const newProducts = [...products];
+                      const draggedIdx = newProducts.findIndex((item) => item.id === draggedProductId);
+                      const droppedIdx = newProducts.findIndex((item) => item.id === p.id);
+                      if (draggedIdx !== -1 && droppedIdx !== -1) {
+                        const temp = newProducts[draggedIdx];
+                        newProducts[draggedIdx] = newProducts[droppedIdx];
+                        newProducts[droppedIdx] = temp;
+                        saveProducts(newProducts);
+                      }
+                    }
+                    setDraggedProductId(null);
+                    setDragOverProductId(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedProductId(null);
+                    setDragOverProductId(null);
+                  }}
+                  className={`p-2.5 rounded-2xl border text-xs shadow-2xs space-y-2 transition-all cursor-grab active:cursor-grabbing ${
+                    draggedProductId === p.id
+                      ? "opacity-40 scale-95 border-emerald-500 bg-emerald-50"
+                      : dragOverProductId === p.id
+                      ? "border-emerald-500 bg-emerald-100 scale-[1.02] shadow-md z-10"
+                      : "bg-slate-50 border-slate-200"
+                  }`}
                 >
                   {/* HÀNG 1: TÊN HÀNG HÓA RỘNG RÃI TOÀN BỘ CHIỀU RỘNG */}
                   <div>

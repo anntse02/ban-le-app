@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { SaleRecord } from "@/types";
+import { SaleRecord, ProductItem } from "@/types";
 import { formatVietnamDisplayDate } from "@/lib/dateUtils";
 import { formatCurrencyVND, formatNumberVN, parseQuantityInput } from "@/lib/formatters";
 import {
@@ -16,12 +16,14 @@ import {
 
 interface PartialPickupsTabProps {
   records: SaleRecord[];
+  products?: ProductItem[];
   onAddPickup: (recordId: string, pickupQuantity: number, note?: string) => Promise<void>;
   onDeleteRecord?: (id: string, reason: string) => Promise<void>;
 }
 
 export default function PartialPickupsTab({
   records,
+  products = [],
   onAddPickup,
 }: PartialPickupsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -45,7 +47,7 @@ export default function PartialPickupsTab({
       (rec.customerName && rec.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       rec.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (rec.seller && rec.seller.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (rec.note && rec.note.toLowerCase().includes(searchTerm.toLowerCase()));
+      rec.date.includes(searchTerm);
 
     return matchesSearch;
   });
@@ -63,6 +65,16 @@ export default function PartialPickupsTab({
     if (qty > remaining) {
       alert(`Số lượng lấy (${qty} bao) vượt quá số bao còn lại (${remaining} bao)!`);
       return;
+    }
+
+    // Kiểm tra tồn kho hiện có
+    const prod = products.find((p) => p.name === rec.itemName);
+    if (prod) {
+      const curStock = rec.bagType === "25kg" ? (prod.stock25kg ?? 0) : (prod.stock50kg ?? 0);
+      if (qty > curStock) {
+        alert(`Số lượng lấy (${qty} bao) vượt quá lượng tồn kho thực tế hiện tại (${curStock} bao)! Vui lòng kiểm tra lại kho.`);
+        return;
+      }
     }
 
     setSubmittingId(rec.id);
@@ -165,9 +177,17 @@ export default function PartialPickupsTab({
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-pink-100 text-pink-700">
                         Hằng
                       </span>
-                    ) : (
+                    ) : rec.seller === "Gấm" ? (
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-100 text-purple-700">
                         Gấm
+                      </span>
+                    ) : rec.seller === "Duyên" ? (
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800">
+                        Duyên
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700">
+                        {rec.seller || "—"}
                       </span>
                     )}
                   </div>

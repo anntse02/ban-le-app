@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { SaleRecord } from "@/types";
+import React, { useState, useMemo } from "react";
+import { SaleRecord, StockInRecord } from "@/types";
 import { formatVietnamDisplayDate, getVietnamDate } from "@/lib/dateUtils";
 import { formatCurrencyVND, formatNumberVN } from "@/lib/formatters";
 import {
@@ -18,10 +18,12 @@ import {
   RotateCcw,
   Layers,
   AlertTriangle,
+  ArrowDownToLine,
 } from "lucide-react";
 
 interface SalesTableProps {
   records: SaleRecord[];
+  stockInRecords?: StockInRecord[];
   onDeleteRecord: (id: string, reason: string) => Promise<void>;
   selectedDate: string;
   onDateChange: (date: string) => void;
@@ -36,10 +38,11 @@ interface ItemSummary {
   totalRevenue: number;
 }
 
-type FilterTab = "all" | "Hằng" | "Gấm" | "paid" | "unpaid" | "partial";
+type FilterTab = "all" | "Hằng" | "Gấm" | "Duyên" | "paid" | "unpaid" | "partial";
 
 export default function SalesTable({
   records,
+  stockInRecords = [],
   onDeleteRecord,
   selectedDate,
   onDateChange,
@@ -62,6 +65,7 @@ export default function SalesTable({
   // Đếm theo người bán, trạng thái thu tiền và đơn lấy nhiều lần
   const countHang = records.filter((r) => r.seller === "Hằng" && !r.isDeleted).length;
   const countGam = records.filter((r) => r.seller === "Gấm" && !r.isDeleted).length;
+  const countDuyen = records.filter((r) => r.seller === "Duyên" && !r.isDeleted).length;
   const countPaid = records.filter((r) => r.paymentStatus !== "unpaid" && !r.isDeleted).length;
   const countUnpaid = records.filter((r) => r.paymentStatus === "unpaid" && !r.isDeleted).length;
   const countPartial = records.filter((r) => r.isPartialPickup && !r.isDeleted).length;
@@ -71,6 +75,7 @@ export default function SalesTable({
     let matchesFilter = true;
     if (activeFilter === "Hằng") matchesFilter = rec.seller === "Hằng";
     else if (activeFilter === "Gấm") matchesFilter = rec.seller === "Gấm";
+    else if (activeFilter === "Duyên") matchesFilter = rec.seller === "Duyên";
     else if (activeFilter === "paid") matchesFilter = rec.paymentStatus !== "unpaid";
     else if (activeFilter === "unpaid") matchesFilter = rec.paymentStatus === "unpaid";
     else if (activeFilter === "partial") matchesFilter = !!rec.isPartialPickup;
@@ -90,6 +95,15 @@ export default function SalesTable({
   const activeRecords = records.filter((r) => !r.isDeleted);
   const totalRevenueDay = activeRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
   const totalBagsDay = activeRecords.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+
+  // Lọc danh sách đợt nhập kho trong ngày đang xem
+  const dayStockInRecords = useMemo(() => {
+    return stockInRecords.filter((r) => r.date === selectedDate && !r.isDeleted);
+  }, [stockInRecords, selectedDate]);
+
+  const totalDayImportBags = useMemo(() => {
+    return dayStockInRecords.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  }, [dayStockInRecords]);
 
   // Bảng tổng hợp theo từng loại hàng
   const itemSummaryMap = new Map<string, ItemSummary>();
@@ -281,6 +295,19 @@ export default function SalesTable({
               }`}
             >
               Gấm ({countGam})
+            </button>
+
+            {/* Nút Duyên */}
+            <button
+              type="button"
+              onClick={() => setActiveFilter("Duyên")}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
+                activeFilter === "Duyên"
+                  ? "bg-amber-600 text-white shadow-2xs"
+                  : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+              }`}
+            >
+              Duyên ({countDuyen})
             </button>
 
             {/* Nút ĐÃ THU */}
@@ -575,6 +602,10 @@ export default function SalesTable({
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
                             Gấm
                           </span>
+                        ) : rec.seller === "Duyên" ? (
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            Duyên
+                          </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                             {rec.seller || "—"}
@@ -688,6 +719,72 @@ export default function SalesTable({
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. CHI TIẾT NHẬP KHO TRONG NGÀY ĐANG XEM */}
+      <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shadow-2xs">
+              <ArrowDownToLine className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-slate-800">
+                Chi Tiết Nhập Kho Ngày {formatVietnamDisplayDate(selectedDate)}
+              </h3>
+              <p className="text-[10px] text-slate-400">
+                Lịch sử nhập kho lưu theo ngày và làm mới mỗi ngày
+              </p>
+            </div>
+          </div>
+
+          <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+            {dayStockInRecords.length} đợt nhập ({totalDayImportBags} bao)
+          </span>
+        </div>
+
+        {dayStockInRecords.length === 0 ? (
+          <div className="py-4 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            <p className="text-xs font-medium">Không có đợt nhập kho nào trong ngày này</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {dayStockInRecords.map((rec) => (
+              <div
+                key={rec.id}
+                className="bg-slate-50/80 hover:bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 flex items-start justify-between gap-2 transition"
+              >
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-black text-slate-800 truncate">{rec.itemName}</span>
+                    <span className="bg-teal-100 text-teal-800 text-[10px] font-extrabold px-1.5 py-0.2 rounded">
+                      +{rec.quantity} bao ({rec.bagType})
+                    </span>
+                    {rec.time && (
+                      <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">
+                        <Clock className="w-3 h-3" />
+                        {rec.time}
+                      </span>
+                    )}
+                  </div>
+                  {(rec.unitCost || rec.note) && (
+                    <p className="text-[10px] text-slate-500">
+                      {rec.unitCost && (
+                        <span>
+                          Giá nhập: <strong className="text-slate-700">{formatCurrencyVND(rec.unitCost)}</strong>
+                          {rec.totalCost && (
+                            <span> (Tổng: <strong className="text-teal-700">{formatCurrencyVND(rec.totalCost)}</strong>)</span>
+                          )}
+                        </span>
+                      )}
+                      {rec.note && <span className="italic ml-1.5">— {rec.note}</span>}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

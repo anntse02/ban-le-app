@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { SaleRecord } from "@/types";
+import { SaleRecord, StockInRecord } from "@/types";
 import { getVietnamDate, formatVietnamDisplayDate } from "@/lib/dateUtils";
 import { formatCurrencyVND } from "@/lib/formatters";
 import { X, Download, FileSpreadsheet, Calendar, CheckCircle2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { X, Download, FileSpreadsheet, Calendar, CheckCircle2 } from "lucide-rea
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  stockInRecords?: StockInRecord[];
   onFetchRecords: (
     mode: "range" | "multiday",
     startDate: string,
@@ -19,7 +20,12 @@ interface ExportModalProps {
 
 type ExportMode = "range" | "multiday";
 
-export default function ExportModal({ isOpen, onClose, onFetchRecords }: ExportModalProps) {
+export default function ExportModal({
+  isOpen,
+  onClose,
+  stockInRecords = [],
+  onFetchRecords,
+}: ExportModalProps) {
   const today = getVietnamDate();
   const [mode, setMode] = useState<ExportMode>("range");
   const [startDate, setStartDate] = useState(today);
@@ -101,11 +107,26 @@ export default function ExportModal({ isOpen, onClose, onFetchRecords }: ExportM
     setSuccessMsg(null);
     const exportStart = mode === "range" ? startDate : (parsedDays[0] || today);
     const exportEnd = mode === "range" ? endDate : (parsedDays[parsedDays.length - 1] || today);
+
+    // Lọc stockInRecords theo khoảng ngày hoặc các ngày đã chọn
+    const filteredStockIns = (stockInRecords || []).filter((r) => {
+      if (r.isDeleted) return false;
+      if (mode === "range") {
+        return r.date >= exportStart && r.date <= exportEnd;
+      }
+      return parsedDays.includes(r.date);
+    });
+
     try {
       const res = await fetch("/api/export-excel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: previewRecords, startDate: exportStart, endDate: exportEnd }),
+        body: JSON.stringify({
+          records: previewRecords,
+          startDate: exportStart,
+          endDate: exportEnd,
+          stockInRecords: filteredStockIns,
+        }),
       });
       if (!res.ok) throw new Error("Không thể tạo file Excel!");
       const blob = await res.blob();

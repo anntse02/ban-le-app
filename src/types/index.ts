@@ -1,6 +1,6 @@
 export type PaymentMethod = "cash" | "transfer";
 export type PaymentStatus = "paid" | "unpaid";
-export type Seller = "Hằng" | "Gấm" | string;
+export type Seller = "Hằng" | "Gấm" | "Duyên" | string;
 export type BagType = "25kg" | "50kg" | "Khác" | string;
 
 export interface ProductItem {
@@ -9,6 +9,29 @@ export interface ProductItem {
   price: number; // Giá gốc bao 50kg
   allow25kg?: boolean; // Cho phép bán bao 25kg (mặc định true)
   allow50kg?: boolean; // Cho phép bán bao 50kg (mặc định true)
+  stock25kg?: number; // Lượng tồn bao 25kg (số bao)
+  stock50kg?: number; // Lượng tồn bao 50kg (số bao)
+  minStockAlert?: number; // Ngưỡng cảnh báo tồn ít (mặc định 5 bao)
+  updatedAt?: number; // Thời điểm cập nhật cuối
+}
+
+export interface StockInRecord {
+  id: string;
+  date: string;              // YYYY-MM-DD (Giờ VN)
+  time: string;              // HH:mm:ss (Giờ VN)
+  seller?: string;           // Người nhập (Hằng / Gấm / Người khác)
+  productId?: string;        // ID mặt hàng
+  itemName: string;          // Tên hàng hóa
+  bagType: string;           // Loại bao (25kg / 50kg / Khác)
+  quantity: number;          // Số lượng bao nhập
+  unitCost?: number;         // Giá nhập mỗi bao (VNĐ)
+  totalCost?: number;        // Tổng tiền nhập hàng (VNĐ)
+  supplier?: string;         // Nhà cung cấp / Nguồn nhập
+  note?: string;             // Ghi chú đợt nhập
+  createdAt: number;         // Timestamp
+  isDeleted?: boolean;       // Đã xóa/hủy phiếu
+  deleteReason?: string;     // Lý do hủy
+  deletedAt?: number;        // Timestamp thời điểm hủy
 }
 
 export interface Customer {
