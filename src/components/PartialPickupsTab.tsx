@@ -29,7 +29,7 @@ export default function PartialPickupsTab({
   const [searchTerm, setSearchTerm] = useState("");
 
   // State cho form lấy hàng của từng đơn
-  const [pickupInputMap, setPickupInputMap] = useState<Record<string, number | "">>({});
+  const [pickupInputMap, setPickupInputMap] = useState<Record<string, number | string>>({});
   const [pickupNoteMap, setPickupNoteMap] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState<string | null>(null);
 

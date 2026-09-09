@@ -88,6 +88,7 @@ export default function CustomerModal({
   const [newCustomerName, setNewCustomerName] = useState("");
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Long-press detection timer ref
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -166,14 +167,10 @@ export default function CustomerModal({
     }
   };
 
-  // 2. Thêm khách quen mới
-  const handleAddCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = newCustomerName.trim();
-    if (!trimmed) {
-      alert("Vui lòng nhập tên khách quen!");
-      return;
-    }
+  // 2. Thêm khách quen mới (dùng chung cho cả form và thêm nhanh)
+  const addCustomerByName = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
 
     // Kiểm tra trùng
     if (customers.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
@@ -203,25 +200,52 @@ export default function CustomerModal({
     setCustomers(updated);
     saveToLocal(updated);
     setNewCustomerName("");
+    setSearchTerm("");
     setShowAddForm(false);
+  };
+
+  const handleAddCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerName.trim()) {
+      alert("Vui lòng nhập tên khách quen!");
+      return;
+    }
+    await addCustomerByName(newCustomerName);
+  };
+
+  // Thêm nhanh: khi tìm không ra, bấm "Thêm mới" sẽ tự thêm luôn searchTerm
+  const handleQuickAdd = async () => {
+    const trimmed = searchTerm.trim();
+    if (trimmed && sortedAndFiltered.length === 0) {
+      await addCustomerByName(trimmed);
+    } else {
+      setShowAddForm(!showAddForm);
+      if (!showAddForm && trimmed) {
+        setNewCustomerName(trimmed);
+      }
+    }
   };
 
   // 3. Xóa khách quen
   const handleConfirmDelete = async () => {
     if (!deletingCustomer) return;
 
-    if (isFirebaseConfigured() && db && deletingCustomer.id) {
+    const custId = deletingCustomer.id;
+
+    // Cập nhật UI và đóng modal lập tức (Optimistic Update)
+    const updated = customers.filter((c) => c.id !== custId);
+    setCustomers(updated);
+    saveToLocal(updated);
+    setDeletingCustomer(null);
+
+    // Gọi Firebase chạy ngầm
+    if (isFirebaseConfigured() && db && custId) {
       try {
-        await deleteDoc(doc(db, "customers", deletingCustomer.id));
+        await deleteDoc(doc(db, "customers", custId));
       } catch (err) {
         console.warn("Lỗi xóa khách quen Firebase:", err);
       }
     }
-
-    const updated = customers.filter((c) => c.id !== deletingCustomer.id && c.name !== deletingCustomer.name);
-    setCustomers(updated);
-    saveToLocal(updated);
-    setDeletingCustomer(null);
   };
 
   // Long press handlers
@@ -324,7 +348,7 @@ export default function CustomerModal({
 
             <button
               type="button"
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={handleQuickAdd}
               className="py-2 px-3 bg-green-600 hover:bg-green-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs shrink-0 transition"
             >
               <UserPlus className="w-3.5 h-3.5" />
@@ -364,9 +388,19 @@ export default function CustomerModal({
         {/* Danh sách khách quen sắp xếp A-Z dạng dàn ngang tự xuống dòng */}
         <div className="p-3 overflow-y-auto flex-1 space-y-2.5">
           {Object.keys(groupedByLetter).length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-xs">
+            <div className="text-center py-8 text-slate-400 text-xs space-y-3">
               <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              Không tìm thấy khách hàng nào phù hợp.
+              <p>Không tìm thấy khách hàng nào phù hợp.</p>
+              {searchTerm.trim() && (
+                <button
+                  type="button"
+                  onClick={() => addCustomerByName(searchTerm.trim())}
+                  className="mx-auto py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition active:scale-95"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Thêm &quot;{searchTerm.trim()}&quot; vào danh bạ
+                </button>
+              )}
             </div>
           ) : (
             Object.keys(groupedByLetter)
@@ -393,28 +427,28 @@ export default function CustomerModal({
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold select-none cursor-pointer transition-all active:scale-95 ${
                             isSelected
                               ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs ring-2 ring-emerald-400/30"
+                              : isEditMode
+                              ? "bg-red-50 hover:bg-red-100 text-slate-800 border-red-300 shadow-2xs"
                               : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200 shadow-2xs"
                           }`}
                         >
                           <span>{cust.name}</span>
 
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
+                          {isSelected && !isEditMode && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingCustomer(cust);
-                            }}
-                            className={`p-0.5 rounded-md transition shrink-0 ${
-                              isSelected
-                                ? "text-emerald-200 hover:text-white hover:bg-white/20"
-                                : "text-slate-300 hover:text-red-600 hover:bg-red-50"
-                            }`}
-                            title="Xóa khách quen"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          {isEditMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingCustomer(cust);
+                              }}
+                              className="p-0.5 rounded-md transition shrink-0 text-red-400 hover:text-red-600 hover:bg-red-100"
+                              title="Xóa khách quen"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -429,13 +463,26 @@ export default function CustomerModal({
           <span className="text-[11px] text-slate-500 font-medium">
             Tổng cộng: <strong className="text-slate-800">{customers.length}</strong> khách quen
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition active:scale-95"
-          >
-            Đóng
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`py-1.5 px-3 rounded-xl font-bold transition active:scale-95 ${
+                isEditMode
+                  ? "bg-red-100 text-red-700 hover:bg-red-200"
+                  : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+              }`}
+            >
+              {isEditMode ? "Xong" : "Sửa"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsEditMode(false); onClose(); }}
+              className="py-1.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition active:scale-95"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       </div>
 

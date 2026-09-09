@@ -53,3 +53,9 @@ input[type="number"] {
 .animate-shake {
   animation: shake 0.4s ease-in-out;
 }
+/* Fix iOS input auto-zoom by forcing font-size: 16px on mobile */
+@media screen and (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}

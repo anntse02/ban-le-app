@@ -89,7 +89,12 @@ export default function SalesTable({
       (rec.deleteReason && rec.deleteReason.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return matchesFilter && matchesSearch;
-  });
+    }).sort((a, b) => {
+      // Sort by newest first
+      const timeA = (a.createdAt || 0) || (a.time ? parseInt(a.time.replace(":", "")) : 0);
+      const timeB = (b.createdAt || 0) || (b.time ? parseInt(b.time.replace(":", "")) : 0);
+      return timeB - timeA;
+    });
 
   // Tính tổng số liệu hợp lệ của ngày đang xem
   const activeRecords = records.filter((r) => !r.isDeleted);

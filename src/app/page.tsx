@@ -35,6 +35,8 @@ import {
   Lock,
   ChevronUp,
   ChevronDown,
+  User,
+  CheckCircle2,
 } from "lucide-react";
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -54,13 +56,17 @@ const INITIAL_PRODUCTS: ProductItem[] = [
 export default function HomePage() {
   const today = getVietnamDate();
 
-  // Trạng thái khóa bảo vệ mã PIN (Pass: 1977 - Lưu lâu dài trên máy)
+  // Mã PIN bảo vệ (1977)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+
+  // Trạng thái người bán và header
+  const [sellerName, setSellerName] = useState<string>("Hằng");
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState<boolean>(true);
+  const [isSellerDropdownOpen, setIsSellerDropdownOpen] = useState<boolean>(false);
 
   useEffect(() => {
     try {
-      const unlocked = localStorage.getItem("ban_le_auth_unlocked");
-      if (unlocked === "true") {
+      if (localStorage.getItem("ban_le_auth_unlocked") === "true") {
         setIsUnlocked(true);
       }
     } catch (e) {}
@@ -576,6 +582,81 @@ export default function HomePage() {
     }
   };
 
+  // 6b. THÊM NHIỀU GIAO DỊCH BÁN CÙNG LÚC (BÁN NHIỀU LOẠI)
+  const handleAddMultipleRecords = async (recordsList: Omit<SaleRecord, "id" | "createdAt">[]) => {
+    if (!recordsList || recordsList.length === 0) return;
+    setLoading(true);
+
+    const now = Date.now();
+    const createdRecords: SaleRecord[] = recordsList.map((item, idx) => ({
+      ...item,
+      id: "rec_" + (now + idx),
+      createdAt: now + idx,
+    }));
+
+    try {
+      if (isFirebaseConfigured() && db) {
+        createdRecords.forEach((rec) => {
+          try {
+            const newDocRef = doc(collection(db, "sales"));
+            rec.id = newDocRef.id;
+            setDoc(newDocRef, sanitizeForFirestore(rec)).catch((err) => {
+              console.warn("Lỗi đồng bộ Firebase:", err);
+            });
+          } catch (fbErr) {
+            console.warn("Lỗi khởi tạo docRef Firestore:", fbErr);
+          }
+        });
+      }
+
+      const targetDate = recordsList[0].date;
+      setDateRecordsMap((prev) => {
+        const currentList = prev[targetDate] || [];
+        return {
+          ...prev,
+          [targetDate]: [...createdRecords, ...currentList],
+        };
+      });
+
+      const partialsToAdd = createdRecords.filter((r) => r.isPartialPickup);
+      if (partialsToAdd.length > 0) {
+        setPartialRecords((prev) => [...partialsToAdd, ...prev]);
+      }
+
+      // Lưu LocalStorage
+      try {
+        const saved = localStorage.getItem("ban_le_records");
+        const list: SaleRecord[] = saved ? JSON.parse(saved) : [];
+        const combined = [...createdRecords, ...list.filter((r) => !createdRecords.some((cr) => cr.id === r.id))];
+        localStorage.setItem("ban_le_records", JSON.stringify(combined));
+      } catch (e) {}
+
+      setSelectedDate(targetDate);
+
+      // Tự động trừ tồn kho từng mặt hàng
+      recordsList.forEach((newRecord) => {
+        const soldProd = products.find((p) => p.name === newRecord.itemName);
+        if (soldProd) {
+          const deductQty = newRecord.isPartialPickup
+            ? Math.max(0, Number(newRecord.pickedQuantity) || 0)
+            : newRecord.quantity;
+
+          if (deductQty > 0) {
+            const cur25 = Number(soldProd.stock25kg) || 0;
+            const cur50 = Number(soldProd.stock50kg) || 0;
+            const new25 = newRecord.bagType === "25kg" ? Math.max(0, cur25 - deductQty) : cur25;
+            const new50 = newRecord.bagType === "50kg" ? Math.max(0, cur50 - deductQty) : cur50;
+            handleUpdateProductStock(soldProd.id, new25, new50, soldProd.minStockAlert);
+          }
+        }
+      });
+    } catch (err: any) {
+      console.warn("Lỗi lưu nhiều đơn hàng:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 7. XỬ LÝ LẤY HÀNG NHIỀU LẦN (TỰ ĐỘNG TRỪ TỒN KHO THEO SỐ LƯỢNG LẤY THỰC TẾ)
   const handleAddPickup = async (recordId: string, pickupQuantity: number, pickupNote?: string) => {
     const autoDate = getVietnamDate();
@@ -820,24 +901,73 @@ export default function HomePage() {
   const currentViewRecords = (dateRecordsMap[selectedDate] || []).filter(isRecordInSalesBook);
   const formatVND = (num: number) => formatCurrencyVND(num);
 
+
+
   if (!isUnlocked) {
     return <PinLockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
+  const renderTabs = (isCompact: boolean) => (
+    <div className={`grid grid-cols-3 gap-1 bg-slate-200/90 rounded-xl shadow-2xs font-bold ${isCompact ? 'p-0.5 text-[10px] sm:text-[11px]' : 'p-1 text-[11px]'}`}>
+      <button
+        type="button"
+        onClick={() => setActiveTab("form")}
+        className={`py-1.5 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
+          activeTab === "form"
+            ? "bg-white text-green-700 shadow-xs scale-[1.01]"
+            : "text-slate-600 hover:text-slate-900"
+        }`}
+      >
+        <PlusCircle className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <span className="truncate">{isCompact ? "Bán" : "Nhập Bán"}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("pickups")}
+        className={`py-1.5 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
+          activeTab === "pickups"
+            ? "bg-white text-teal-700 shadow-xs scale-[1.01]"
+            : "text-slate-600 hover:text-slate-900"
+        }`}
+      >
+        <Layers className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <span className="truncate">
+          {isCompact ? `Gửi (${pendingPickupsCount})` : `Gửi Lại (${pendingPickupsCount})`}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("table")}
+        className={`py-1.5 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
+          activeTab === "table"
+            ? "bg-white text-emerald-700 shadow-xs scale-[1.01]"
+            : "text-slate-600 hover:text-slate-900"
+        }`}
+      >
+        <ClipboardList className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+        <span className="truncate">{isCompact ? `Sổ (${todayActiveRecords.length})` : `Sổ Đơn (${todayActiveRecords.length})`}</span>
+      </button>
+    </div>
+  );
+
   return (
-    <main className="min-h-screen bg-slate-100/70 pb-16 sm:pb-8 text-slate-800">
+    <main className="min-h-screen bg-slate-100/70 pb-10 sm:pb-8 text-slate-800">
       {/* Header Sticky Sáng Cực Gọn */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-2xl mx-auto px-3 sm:px-4 h-12 sm:h-13 flex items-center justify-between">
+      <header className={`bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs transition-all duration-300 py-1`}>
+        <div className={`max-w-2xl mx-auto px-2 sm:px-4 flex items-center justify-between transition-all duration-300 h-10 sm:h-12`}>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-green-600 flex items-center justify-center text-white shadow-2xs">
-              <Store className="w-3.5 h-3.5" />
+            <div className={`rounded-lg bg-green-600 flex items-center justify-center text-white shadow-2xs transition-all ${isHeaderExpanded ? 'w-7 h-7' : 'w-5 h-5'}`}>
+              <Store className={isHeaderExpanded ? "w-3.5 h-3.5" : "w-2.5 h-2.5"} />
             </div>
             <div>
-              <h1 className="text-xs sm:text-sm font-black tracking-tight text-slate-800 flex items-center gap-1">
+              <h1 className={`${isHeaderExpanded ? 'text-xs sm:text-sm' : 'text-[10px]'} font-black tracking-tight text-slate-800 flex items-center gap-1 transition-all`}>
                 SỔ BÁN LẺ
                 <span
-                  className={`text-[9px] uppercase font-bold px-1 py-0.2 rounded ${
+                  className={`uppercase font-bold px-1 py-0.2 rounded transition-all ${
+                    isHeaderExpanded ? 'text-[9px]' : 'text-[7px]'
+                  } ${
                     isFirebaseConnected
                       ? "bg-green-100 text-green-700"
                       : "bg-amber-100 text-amber-700"
@@ -846,91 +976,107 @@ export default function HomePage() {
                   {isFirebaseConnected ? "ONLINE" : "LOCAL"}
                 </span>
               </h1>
-              <p className="text-[9px] text-slate-400">
-                {getVietnamTodayDisplay()} • Giờ VN (GMT+7)
-              </p>
+              {isHeaderExpanded && (
+                <p className="text-[9px] text-slate-400">
+                  {getVietnamTodayDisplay()} • Giờ VN (GMT+7)
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setIsExportModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white text-[11px] font-bold rounded-xl shadow-2xs transition"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Xuất Excel</span>
-            </button>
+          {!isHeaderExpanded && (
+            <div className="flex-1 px-1 sm:px-2 flex justify-center max-w-[320px]">
+              {renderTabs(true)}
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isHeaderExpanded && (
+              <>
+                {/* Chọn Người Bán */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsSellerDropdownOpen(!isSellerDropdownOpen)}
+                    className="flex items-center gap-1 px-2 py-1.5 bg-pink-50 hover:bg-pink-100 active:scale-95 text-pink-700 text-[10px] sm:text-[11px] font-bold rounded-xl border border-pink-200 transition"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>{sellerName}</span>
+                    <ChevronDown className="w-3 h-3 opacity-70" />
+                  </button>
+                  
+                  {isSellerDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSellerDropdownOpen(false)}></div>
+                      <div className="absolute right-0 top-full mt-1.5 w-32 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 overflow-hidden">
+                        {["Hằng", "Gấm", "Duyên"].map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => {
+                              setSellerName(name);
+                              setIsSellerDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center justify-between hover:bg-slate-50 transition ${sellerName === name ? 'text-pink-600 bg-pink-50/50' : 'text-slate-600'}`}
+                          >
+                            {name}
+                            {sellerName === name && <CheckCircle2 className="w-3 h-3 text-pink-600" />}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white text-[11px] font-bold rounded-xl shadow-2xs transition"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Xuất Excel</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLockApp}
+                  className="p-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded-xl transition"
+                  title="Khóa ứng dụng"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
 
             <button
               type="button"
-              onClick={handleLockApp}
-              className="p-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded-xl transition"
-              title="Khóa ứng dụng"
+              onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
+              className="p-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-500 rounded-xl transition ml-1"
             >
-              <Lock className="w-3.5 h-3.5" />
+              {isHeaderExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>
+
+        {/* THANH CHỌN THẺ NẰM TRONG HEADER (NẾU MỞ RỘNG) */}
+        {isHeaderExpanded && (
+          <div className="max-w-2xl mx-auto px-2 sm:px-4 pb-1 mt-1 animate-fadeIn">
+            {renderTabs(false)}
+          </div>
+        )}
       </header>
 
       {/* Main Container: 2 Cột trên PC */}
-      <div className="max-w-7xl mx-auto px-2.5 sm:px-4 pt-2 lg:flex lg:gap-4 lg:items-start">
+      <div className="max-w-7xl mx-auto px-1.5 sm:px-4 pt-1.5 lg:flex lg:gap-4 lg:items-start">
         {/* CỘT TRÁI: SỔ BÁN LẺ */}
-        <div className="w-full lg:flex-1 lg:max-w-2xl mx-auto space-y-2">
-        {/* THANH CHỌN THẺ NẰM NGAY ĐẦU TRANG (3 THẺ GỌN ĐẸP) */}
-        <div className="grid grid-cols-3 gap-1 bg-slate-200/90 p-1 rounded-xl shadow-2xs text-[11px] font-bold">
-          {/* Tab 1: Nhập Bán */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("form")}
-            className={`py-1.5 sm:py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
-              activeTab === "form"
-                ? "bg-white text-green-700 shadow-xs scale-[1.01]"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span className="truncate">Nhập Bán</span>
-          </button>
-
-          {/* Tab 2: Lấy Nhiều Lần (Ở GIỮA) */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("pickups")}
-            className={`py-1.5 sm:py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
-              activeTab === "pickups"
-                ? "bg-white text-teal-700 shadow-xs scale-[1.01]"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="truncate">
-              Lấy Nhiều Lần ({pendingPickupsCount})
-            </span>
-          </button>
-
-          {/* Tab 3: Sổ Đơn (Ở CUỐI) */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("table")}
-            className={`py-1.5 sm:py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
-              activeTab === "table"
-                ? "bg-white text-emerald-700 shadow-xs scale-[1.01]"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <ClipboardList className="w-3.5 h-3.5" />
-            <span className="truncate">Sổ Đơn ({todayActiveRecords.length})</span>
-          </button>
-        </div>
-
+        <div className="w-full lg:flex-1 lg:max-w-2xl mx-auto space-y-1.5">
         {/* NỘI DUNG THẺ */}
         {activeTab === "form" ? (
           <div className="space-y-2.5">
             {/* Form Tạo Đơn */}
             <SalesForm 
               onAddRecord={handleAddRecord} 
+              seller={sellerName}
               loading={loading} 
             />
 

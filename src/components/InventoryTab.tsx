@@ -68,19 +68,19 @@ export default function InventoryTab({
   // Modal Nhập Thêm Số Lượng Cho 1 Mặt Hàng Đang Có (Ảnh 3)
   const [quickStockInProduct, setQuickStockInProduct] = useState<ProductItem | null>(null);
   const [quickBagType, setQuickBagType] = useState<BagType>("50kg");
-  const [quickQty, setQuickQty] = useState<number | "">(10);
-  const [quickCost, setQuickCost] = useState<number | "">("");
+  const [quickQty, setQuickQty] = useState<number | string>(10);
+  const [quickCost, setQuickCost] = useState<number | string>("");
   const [quickNote, setQuickNote] = useState<string>("");
   const [isSubmittingQuick, setIsSubmittingQuick] = useState<boolean>(false);
 
   // Form Nhập Mặt Hàng Mới Vào Kho (Ảnh 2)
   const [newProdName, setNewProdName] = useState<string>("");
-  const [newProdPrice, setNewProdPrice] = useState<number | "">(350000);
+  const [newProdPrice, setNewProdPrice] = useState<number | string>(350000);
   const [newProdAllow25, setNewProdAllow25] = useState<boolean>(true);
   const [newProdAllow50, setNewProdAllow50] = useState<boolean>(true);
-  const [newProdStock25, setNewProdStock25] = useState<number | "">(10);
-  const [newProdStock50, setNewProdStock50] = useState<number | "">(10);
-  const [newProdUnitCost, setNewProdUnitCost] = useState<number | "">("");
+  const [newProdStock25, setNewProdStock25] = useState<number | string>(10);
+  const [newProdStock50, setNewProdStock50] = useState<number | string>(10);
+  const [newProdUnitCost, setNewProdUnitCost] = useState<number | string>("");
   const [newProdNote, setNewProdNote] = useState<string>("");
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   const [showStockInSuccess, setShowStockInSuccess] = useState<boolean>(false);
@@ -681,7 +681,7 @@ export default function InventoryTab({
               <div className="relative">
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={newProdPrice === "" ? "" : formatCurrencyInput(newProdPrice)}
                   onChange={(e) => setNewProdPrice(parseCurrencyInput(e.target.value))}
                   placeholder="VD: 350.000"
@@ -731,7 +731,7 @@ export default function InventoryTab({
                   <div className="relative">
                     <input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       value={newProdStock25 === "" ? "" : newProdStock25}
                       onChange={(e) => setNewProdStock25(parseQuantityInput(e.target.value))}
                       placeholder="Nhập số bao 25kg..."
@@ -752,7 +752,7 @@ export default function InventoryTab({
                   <div className="relative">
                     <input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       value={newProdStock50 === "" ? "" : newProdStock50}
                       onChange={(e) => setNewProdStock50(parseQuantityInput(e.target.value))}
                       placeholder="Nhập số bao 50kg..."
@@ -775,7 +775,7 @@ export default function InventoryTab({
                 <div className="relative">
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="decimal"
                     value={newProdUnitCost === "" ? "" : formatCurrencyInput(newProdUnitCost)}
                     onChange={(e) => setNewProdUnitCost(parseCurrencyInput(e.target.value))}
                     placeholder="VD: 320.000"
@@ -1015,7 +1015,7 @@ export default function InventoryTab({
                 <div className="relative">
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="decimal"
                     value={quickQty === "" ? "" : quickQty}
                     onChange={(e) => setQuickQty(parseQuantityInput(e.target.value))}
                     placeholder="Nhập số bao..."
@@ -1053,7 +1053,7 @@ export default function InventoryTab({
                 <div className="relative">
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="decimal"
                     value={quickCost === "" ? "" : formatCurrencyInput(quickCost)}
                     onChange={(e) => setQuickCost(parseCurrencyInput(e.target.value))}
                     placeholder="VD: 320.000"

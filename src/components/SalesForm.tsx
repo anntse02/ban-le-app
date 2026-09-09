@@ -29,6 +29,7 @@ import {
 interface SalesFormProps {
   onAddRecord: (record: Omit<SaleRecord, "id" | "createdAt">) => Promise<void>;
   loading?: boolean;
+  seller: string;
 }
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -63,8 +64,7 @@ export const getBasePriceKg = (basePrice50kg: number, targetBagType: string): nu
   return bagPrice / (targetBagType === "25kg" ? 25 : 50);
 };
 
-export default function SalesForm({ onAddRecord, loading = false }: SalesFormProps) {
-  const [seller, setSeller] = useState<string>("Hằng");
+export default function SalesForm({ onAddRecord, loading = false, seller }: SalesFormProps) {
 
   // Khách hàng (3 ô: Khách lẻ mặc định | Bảng khách quen ở giữa | Nhập tên ở cuối)
   const [isRetail, setIsRetail] = useState<boolean>(true);
@@ -84,7 +84,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
 
   // Chi tiết đơn
   const [bagType, setBagType] = useState<BagType>("50kg");
-  const [quantity, setQuantity] = useState<number | "">(1);
+  const [quantity, setQuantity] = useState<number | string>(1);
   const [unitPrice, setUnitPrice] = useState<number | string>(0); 
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
@@ -95,6 +95,14 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
   const [firstPickupQty, setFirstPickupQty] = useState<number>(1);
 
   const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
+
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [customItemInput, setCustomItemInput] = useState<string>("");
+
+  const handleRemoveFromCart = (id: string) => {
+    setCartItems((prev) => prev.filter((it) => it.id !== id));
+  };
 
   // Tìm mặt hàng hiện tại đang chọn
   const currentProduct = products.find((p) => p.name === selectedItemName) || products[0];
@@ -317,73 +325,50 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItemName.trim()) {
-      alert("Vui lòng chọn tên hàng hóa!");
-      return;
-    }
-    if (numQty <= 0) {
-      alert("Số lượng bao phải lớn hơn 0!");
-      return;
-    }
-    if (numPrice <= 0) {
-      alert("Vui lòng nhập đơn giá hợp lệ!");
-      return;
-    }
-
-    const currentStock = bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0);
-    const qtyTakenNow = isPartialPickup ? Math.min(numQty, Math.max(0, firstPickupQty)) : numQty;
-    if (qtyTakenNow > currentStock) {
-      alert(`Số lượng lấy ngay (${qtyTakenNow} bao) không được vượt quá số lượng tồn kho hiện có (${currentStock} bao)!`);
-      return;
-    }
-
+    
     const autoDate = getVietnamDate();
     const autoTime = getVietnamTime();
 
-    // Xử lý đơn lấy nhiều lần
-    let partialData: Partial<SaleRecord> = {};
-    if (isPartialPickup) {
-      const initialPicked = Math.min(numQty, Math.max(0, firstPickupQty));
-      const isDone = initialPicked >= numQty;
-      const historyItem: PickupEvent = {
-        id: "pick_" + Date.now(),
-        date: autoDate,
-        time: autoTime,
-        quantity: initialPicked,
-        note: "Lấy lần đầu khi tạo đơn",
-        createdAt: Date.now(),
-      };
-
-      partialData = {
-        isPartialPickup: true,
-        pickupStatus: isDone ? "completed" : "pending",
-        pickedQuantity: initialPicked,
-        pickupHistory: initialPicked > 0 ? [historyItem] : [],
-        ...(isDone ? { completedAt: Date.now() } : {}),
-      };
-    } else {
-      partialData = {
-        isPartialPickup: false,
-      };
+    // Nếu giỏ hàng rỗng, tự thêm món đang chọn trên form
+    let itemsToProcess = [...cartItems];
+    if (itemsToProcess.length === 0 && numQty > 0 && finalBagPrice > 0 && !isOutOfStock) {
+      itemsToProcess.push({
+        id: "single_item",
+        itemName: selectedItemName.trim(),
+        bagType,
+        quantity: numQty,
+        unitPrice: numPrice,
+        totalPrice: totalPrice,
+      });
     }
 
-    await onAddRecord({
-      date: autoDate,
-      time: autoTime,
-      seller,
-      customerName: finalCustomerName,
-      itemName: selectedItemName.trim(),
-      bagType,
-      quantity: numQty,
-      unitPrice: finalBagPrice, // Lưu theo giá của 1 bao để tương thích với lịch sử
-      totalPrice,
-      paymentStatus,
-      paymentMethod: "cash",
-      note: note.trim(),
-      ...partialData,
-    });
+    if (itemsToProcess.length === 0) {
+      alert("Vui lòng chọn ít nhất một mặt hàng!");
+      return;
+    }
 
-    // Reset Form về mặc định
+    for (const item of itemsToProcess) {
+      let partialData: Partial<SaleRecord> = { isPartialPickup: false };
+      if (isPartialPickup) {
+         partialData = { isPartialPickup: true };
+      }
+      await onAddRecord({
+        date: autoDate,
+        time: autoTime,
+        seller,
+        customerName: finalCustomerName,
+        itemName: item.itemName,
+        bagType: item.bagType,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice * (item.bagType === "25kg" ? 25 : 50),
+        totalPrice: item.totalPrice,
+        paymentStatus,
+        paymentMethod: "cash",
+        note: note.trim(),
+        ...partialData,
+      });
+    }
+
     setQuantity(1);
     setIsRetail(true);
     setSelectedFrequentCustomer("");
@@ -393,26 +378,65 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
     setIsPartialPickup(false);
     setFirstPickupQty(1);
     setIsEditingPrice(false);
+    setCartItems([]);
+    setCurrentStep(1);
     if (currentProduct) {
       setUnitPrice(getBasePriceKg(currentProduct.price, bagType));
     }
-
     setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 2500);
+    setTimeout(() => setShowSuccessToast(false), 2000);
   };
 
+  // Hiển thị bảng tạm tính: gồm các món đã thêm + món đang chọn trên form (preview)
+  const currentCart = [...cartItems];
+  if (numQty > 0 && finalBagPrice > 0 && !isOutOfStock && currentProduct) {
+    currentCart.push({
+      id: "cart_staging",
+      itemName: selectedItemName.trim(),
+      bagType,
+      quantity: numQty,
+      unitPrice: numPrice,
+      totalPrice: totalPrice,
+    });
+  }
+  const grandTotal = currentCart.reduce((sum, it) => sum + it.totalPrice, 0);
+
+  const isStepGlowing = (stepNumber: number) => currentStep <= stepNumber;
+  const renderStepBadge = (stepNumber: number, title: string) => {
+    const isGlow = isStepGlowing(stepNumber);
+    return (
+      <div className="flex items-center gap-1.5 mb-1">
+        <div
+          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-black transition-all duration-300 ${
+            isGlow
+              ? "bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.6)] scale-110"
+              : "bg-slate-200 text-slate-500"
+          }`}
+        >
+          {stepNumber}
+        </div>
+        <span
+          className={`text-[9px] sm:text-[10px] font-black tracking-wider transition-colors duration-300 ${
+            isGlow ? "text-emerald-700" : "text-slate-500"
+          }`}
+        >
+          {title}
+        </span>
+      </div>
+    );
+  };
   return (
-    <div className="bg-white rounded-3xl shadow-xs border border-slate-200 p-3 sm:p-4 relative overflow-hidden text-slate-800 w-full max-w-full">
+    <div className="bg-white rounded-3xl shadow-xs border border-slate-200 p-2 sm:p-3 relative overflow-hidden text-slate-800 w-full max-w-full">
       {/* Toast thông báo lưu thành công */}
       {showSuccessToast && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[11px] font-bold px-3.5 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 z-20 animate-bounce pointer-events-none">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Đã lưu đơn thành công vào sổ!</span>
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-sm sm:text-base font-black px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-center gap-2 z-[100] animate-bounce pointer-events-none w-11/12 max-w-sm">
+          <CheckCircle2 className="w-6 h-6 shrink-0" />
+          <span className="text-center">Đã lưu đơn hàng thành công vào sổ!</span>
         </div>
       )}
 
       {/* Header Form Gọn Nhẹ */}
-      <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-1 mb-1.5 border-b border-slate-100">
         <div className="flex items-center gap-1.5">
           <PlusCircle className="w-4 h-4 text-green-600" />
           <h2 className="text-xs sm:text-sm font-black text-slate-800">Tạo Đơn Bán Mới</h2>
@@ -422,102 +446,11 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
         </span>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3">
-        {/* 1. NGƯỜI BÁN (HẰNG / GẤM / DUYÊN) */}
-        <div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {/* Nút Hằng */}
-            <button
-              type="button"
-              onClick={() => setSeller("Hằng")}
-              className={`flex items-center gap-1.5 p-2 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
-                seller === "Hằng"
-                  ? "bg-pink-50 border-pink-500 ring-1 ring-pink-400/30 shadow-2xs"
-                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 opacity-75"
-              }`}
-            >
-              <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base font-bold shrink-0 ${
-                  seller === "Hằng"
-                    ? "bg-gradient-to-tr from-pink-500 to-rose-400 text-white shadow-2xs"
-                    : "bg-slate-200 text-slate-600"
-                }`}
-              >
-                👩
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className={`font-black text-xs sm:text-sm truncate ${seller === "Hằng" ? "text-pink-900" : "text-slate-700"}`}>
-                    Hằng
-                  </span>
-                  {seller === "Hằng" && <CheckCircle2 className="w-3.5 h-3.5 text-pink-600 shrink-0" />}
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">Bán hàng</span>
-              </div>
-            </button>
+      <form onSubmit={handleSubmit} className="space-y-1.5 sm:space-y-2">
 
-            {/* Nút Gấm */}
-            <button
-              type="button"
-              onClick={() => setSeller("Gấm")}
-              className={`flex items-center gap-1.5 p-2 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
-                seller === "Gấm"
-                  ? "bg-purple-50 border-purple-500 ring-1 ring-purple-400/30 shadow-2xs"
-                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 opacity-75"
-              }`}
-            >
-              <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base font-bold shrink-0 ${
-                  seller === "Gấm"
-                    ? "bg-gradient-to-tr from-purple-500 to-indigo-400 text-white shadow-2xs"
-                    : "bg-slate-200 text-slate-600"
-                }`}
-              >
-                👱‍♀️
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className={`font-black text-xs sm:text-sm truncate ${seller === "Gấm" ? "text-purple-900" : "text-slate-700"}`}>
-                    Gấm
-                  </span>
-                  {seller === "Gấm" && <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 shrink-0" />}
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">Bán hàng</span>
-              </div>
-            </button>
-
-            {/* Nút Duyên */}
-            <button
-              type="button"
-              onClick={() => setSeller("Duyên")}
-              className={`flex items-center gap-1.5 p-2 rounded-2xl border-2 text-left transition-all active:scale-[0.98] min-w-0 ${
-                seller === "Duyên"
-                  ? "bg-amber-50 border-amber-500 ring-1 ring-amber-400/30 shadow-2xs"
-                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 opacity-75"
-              }`}
-            >
-              <div
-                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base font-bold shrink-0 ${
-                  seller === "Duyên"
-                    ? "bg-gradient-to-tr from-amber-500 to-orange-400 text-white shadow-2xs"
-                    : "bg-slate-200 text-slate-600"
-                }`}
-              >
-                👩‍🦰
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className={`font-black text-xs sm:text-sm truncate ${seller === "Duyên" ? "text-amber-900" : "text-slate-700"}`}>
-                    Duyên
-                  </span>
-                  {seller === "Duyên" && <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">Bán hàng</span>
-              </div>
-            </button>
-          </div>
-        </div>
-
+        {/* 1. CHỌN KHÁCH HÀNG */}
+        <div onClick={() => setCurrentStep(1)} className={`p-1.5 rounded-2xl border-[1.5px] transition-all duration-300 ${isStepGlowing(1) ? "step-glow-active ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/20" : "border-slate-200/60 bg-slate-50/30"}`}>
+          {renderStepBadge(1, "chọn khách")}
         {/* 2. TÊN KHÁCH HÀNG: TÁCH LÀM 3 Ô */}
         <div>
           <div className="grid grid-cols-3 gap-1.5">
@@ -594,6 +527,10 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           </div>
         </div>
 
+        </div>
+        {/* 2. CHỌN MẶT HÀNG */}
+        <div onClick={() => setCurrentStep(2)} className={`p-1.5 rounded-2xl border-[1.5px] transition-all duration-300 ${isStepGlowing(2) ? "step-glow-active ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/20" : "border-slate-200/60 bg-slate-50/30"}`}>
+          {renderStepBadge(2, "chọn loại hàng")}
         {/* 3. TÊN HÀNG HÓA & NÚT SỬA GIÁ (1 HÀNG) */}
         <div>
           <div className="flex items-center gap-1.5">
@@ -621,6 +558,10 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           </div>
         </div>
 
+        </div>
+        {/* 3. CHỌN LOẠI BAO */}
+        <div onClick={() => setCurrentStep(3)} className={`p-1.5 rounded-xl border-[1.5px] transition-all duration-300 ${isStepGlowing(3) ? "step-glow-active ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/20" : "border-slate-200/60 bg-white"}`}>
+          {renderStepBadge(3, "chọn loại bao")}
         {/* 4. LOẠI BAO TRỌNG LƯỢNG (HIỆN RÕ SỐ LƯỢNG TỒN KHO) */}
         <div className="grid grid-cols-2 gap-2">
           {/* Nút Bao 25kg */}
@@ -678,6 +619,10 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           </button>
         </div>
 
+        </div>
+        {/* 4. CHỌN SỐ LƯỢNG BAO */}
+        <div onClick={() => setCurrentStep(4)} className={`p-1.5 rounded-xl border-[1.5px] transition-all duration-300 ${isStepGlowing(4) ? "step-glow-active ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/20" : "border-slate-200/60 bg-white"}`}>
+          {renderStepBadge(4, "chọn số lượng bao")}
         {/* 5. SỐ LƯỢNG & ĐƠN GIÁ (GRID 2 CỘT) */}
         <div className="grid grid-cols-2 gap-2">
           {/* Cụm nút Số Lượng (Tự động xóa số 0 đầu: VD 05 -> 5) */}
@@ -698,7 +643,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
               </button>
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 value={quantity === "" ? "" : quantity}
                 onChange={(e) => {
                   const val = parseQuantityInput(e.target.value);
@@ -733,7 +678,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
             <div className="relative">
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 readOnly={!isEditingPrice}
                 tabIndex={isEditingPrice ? 0 : -1}
                 value={unitPrice === "" ? "" : formatCurrencyInput(unitPrice)}
@@ -765,47 +710,60 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           </div>
         </div>
 
-        {/* 6. TÙY CHỌN: KHÁCH MUA 1 ĐƠN LẤY HÀNG NHIỀU LẦN (GỬI KHO) */}
-        <div className="bg-slate-50 p-2 sm:p-2.5 rounded-2xl border border-slate-200 space-y-1.5 min-w-0">
-          <label className="flex items-center justify-between cursor-pointer select-none">
-            <div className="flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-teal-600 shrink-0" />
-              <span className="text-xs sm:text-sm font-bold text-slate-800 truncate">Khách lấy nhiều lần (Gửi kho)</span>
-            </div>
-            <input
-              type="checkbox"
-              checked={isPartialPickup}
-              onChange={(e) => {
-                setIsPartialPickup(e.target.checked);
-                if (e.target.checked) {
-                  setFirstPickupQty(1);
-                }
-              }}
-              className="w-4.5 h-4.5 rounded text-green-600 focus:ring-green-500 shrink-0"
-            />
-          </label>
-
-          {/* Nếu bật: Nhập số bao lấy lần đầu (Tự động xóa số 0 đầu: 05 -> 5) */}
-          {isPartialPickup && (
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200 text-xs animate-fadeIn">
-              <span className="text-slate-600 font-semibold truncate">Lần này lấy trước:</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={firstPickupQty === 0 ? "" : firstPickupQty}
-                  onChange={(e) => {
-                    const q = parseQuantityInput(e.target.value, numQty);
-                    setFirstPickupQty(typeof q === "number" ? q : 0);
-                  }}
-                  className="w-14 sm:w-16 h-8 px-2 text-center text-xs font-black bg-white border border-slate-300 rounded-xl outline-none focus:border-green-500"
-                />
-                <span className="text-slate-500 font-bold">/ {numQty} bao</span>
+        </div>
+        {/* HÀNG NGANG: GỬI KHO (Bên trái) & THÊM VÀO ĐƠN (Bên phải) */}
+        <div className="flex items-start gap-2 pt-1 pb-1">
+          {/* 6. TÙY CHỌN: KHÁCH MUA 1 ĐƠN LẤY HÀNG NHIỀU LẦN (GỬI KHO) */}
+          <div className="flex-1 bg-slate-50 p-2 sm:p-2.5 rounded-2xl border border-slate-200 space-y-1.5 min-w-0">
+            <label className="flex items-center justify-between cursor-pointer select-none h-8">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Layers className="w-4 h-4 text-teal-600 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold text-slate-800 truncate">Khách lấy nhiều lần (Gửi kho)</span>
               </div>
-            </div>
-          )}
+              <input
+                type="checkbox"
+                checked={isPartialPickup}
+                onChange={(e) => {
+                  setIsPartialPickup(e.target.checked);
+                  if (e.target.checked) {
+                    setFirstPickupQty(1);
+                  }
+                }}
+                className="w-4.5 h-4.5 rounded text-green-600 focus:ring-green-500 shrink-0 ml-2"
+              />
+            </label>
+
+            {/* Nếu bật: Nhập số bao lấy lần đầu (Tự động xóa số 0 đầu: 05 -> 5) */}
+            {isPartialPickup && (
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200 text-xs animate-fadeIn">
+                <span className="text-slate-600 font-semibold truncate">Lần này lấy:</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={firstPickupQty === 0 ? "" : firstPickupQty}
+                    onChange={(e) => {
+                      const q = parseQuantityInput(e.target.value, numQty);
+                      setFirstPickupQty(typeof q === "number" ? q : 0);
+                    }}
+                    className="w-12 sm:w-14 h-7 px-1 text-center text-xs font-black bg-white border border-slate-300 rounded-xl outline-none focus:border-green-500"
+                  />
+                  <span className="text-slate-500 font-bold">/ {numQty}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* NÚT THÊM VÀO ĐƠN (Cho phép thêm nhiều món) */}
+          <button type="button" onClick={(e) => { e.stopPropagation(); if (numQty > 0 && currentProduct && numPrice > 0) { const newItem = { id: Date.now().toString(), itemName: selectedItemName.trim(), bagType, quantity: numQty, unitPrice: numPrice, totalPrice: totalPrice }; setCartItems(prev => [...prev, newItem]); setCurrentStep(2); setSelectedItemName(products[0]?.name || ""); setQuantity(1); setIsEditingPrice(false); setBagType("50kg"); if (products[0]) { setUnitPrice(getBasePriceKg(products[0].price, "50kg")); } } }} className="h-12 sm:h-[42px] px-3 sm:px-4 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-xs rounded-2xl transition-all shadow-sm flex items-center justify-center gap-1 shrink-0 active:scale-95">
+            <span className="text-lg leading-none">+</span>
+            <span>Thêm vào đơn</span>
+          </button>
         </div>
 
+        {/* 5. TRẠNG THÁI THU TIỀN */}
+        <div onClick={() => setCurrentStep(5)} className={`p-1.5 rounded-2xl border-[1.5px] transition-all duration-300 ${isStepGlowing(5) ? "step-glow-active ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/20" : "border-slate-200/60 bg-white"}`}>
+          {renderStepBadge(5, "đã/chưa thu")}
         {/* 7. TRẠNG THÁI THU TIỀN: 2 NÚT NẰM TRÊN CÙNG 1 HÀNG */}
         <div>
           <div className="grid grid-cols-2 gap-2">
@@ -841,20 +799,33 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           </div>
         </div>
 
-        {/* 8. KHUNG THÀNH TIỀN TẠM TÍNH */}
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-green-200 py-2 px-3.5 rounded-2xl flex items-center justify-between shadow-2xs min-w-0">
-          <div className="flex items-baseline gap-1.5 truncate">
-            <span className="text-[11px] font-bold text-green-800">Tạm tính:</span>
-            <span className="text-base sm:text-lg font-black text-green-700 truncate">{formatCurrencyVND(totalPrice)}</span>
-          </div>
-
-          {numQty > 0 && numPrice > 0 && (
-            <span className="text-[10px] sm:text-[11px] font-bold text-green-800/80 bg-white/80 px-2 py-0.5 rounded-lg border border-green-200 shrink-0 ml-1">
-              {numQty * bagWeight} kg × {formatNumberVN(numPrice)} đ/kg
-            </span>
-          )}
         </div>
-
+        {/* 8. KHUNG THÀNH TIỀN TẠM TÍNH (HIỂN THỊ DANH SÁCH MÓN) */}
+        <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 p-3 rounded-2xl shadow-2xs space-y-2">
+          <div className="flex items-baseline justify-between border-b border-emerald-200/50 pb-2">
+            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">Tạm tính:</span>
+            <span className="text-base sm:text-lg font-black text-emerald-700">{formatCurrencyVND(grandTotal)}</span>
+          </div>
+          <div className="space-y-1.5 pt-1">
+            {currentCart.length === 0 ? (
+              <p className="text-[10px] text-slate-400 italic">Chưa chọn mặt hàng nào...</p>
+            ) : (
+              currentCart.map((it, idx) => (
+                <div key={idx} className="flex items-start sm:items-center justify-between text-[11px] sm:text-xs">
+                  <span className="font-bold text-slate-700 truncate mr-2 flex-1">
+                    {it.itemName}
+                    {it.id !== "cart_staging" && (
+                       <button type="button" onClick={(e) => { e.preventDefault(); handleRemoveFromCart(it.id); }} className="ml-2 text-red-500 hover:text-red-700">[Xóa]</button>
+                    )}
+                  </span>
+                  <span className="text-slate-600 shrink-0 font-medium text-right">
+                    {it.quantity} bao × {it.bagType === "25kg" ? 25 : 50}kg × {formatNumberVN(it.unitPrice)} đ/kg = <strong className="text-emerald-700">{formatCurrencyVND(it.totalPrice)}</strong>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
         {/* 9. GHI CHÚ TÙY CHỌN */}
         <div>
           <input
@@ -866,6 +837,9 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
           />
         </div>
 
+        {/* 6. BÁN HÀNG */}
+        <div onClick={() => setCurrentStep(6)} className={`p-1 rounded-2xl transition-all duration-300 ${isStepGlowing(6) ? "step-glow-active rounded-3xl" : ""}`}>
+          {renderStepBadge(6, "bán hàng")}
         {/* 10. NÚT BÁN HÀNG TO RÕ (TỒN 0 BAO SẼ CHUYỂN ĐỎ VÀ LÀM MỜ) */}
         <button
           type="submit"
@@ -887,6 +861,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
             <span>BÁN HÀNG</span>
           )}
         </button>
+        </div>
       </form>
 
       {/* MODAL POPUP: SỬA TÊN, LOẠI BAO & GIÁ (2 HÀNG RỘNG RÃI, KHÔNG STT, CÓ XÁC NHẬN XÓA) */}
@@ -985,7 +960,7 @@ export default function SalesForm({ onAddRecord, loading = false }: SalesFormPro
                     <div className="relative flex-1 min-w-0">
                       <input
                         type="text"
-                        inputMode="numeric"
+                        inputMode="decimal"
                         value={formatCurrencyInput(p.price)}
                         onChange={(e) => handleUpdateProduct(p.id, "price", parseCurrencyInput(e.target.value))}
                         placeholder="Giá 50kg..."
