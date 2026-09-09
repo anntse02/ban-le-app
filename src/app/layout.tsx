@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Quản Lý Bán Lẻ & Báo Cáo Tự Động",
   description: "Ứng dụng nhập liệu doanh số bán lẻ, xuất báo cáo Excel và gửi email tự động",
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
@@ -11,6 +12,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#047857",
 };
 
 export default function RootLayout({
