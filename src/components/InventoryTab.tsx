@@ -20,6 +20,7 @@ import {
   Plus,
   CheckCircle2,
   Trash2,
+  RefreshCcw,
   X,
   ArrowDownToLine,
   FileSpreadsheet,
@@ -31,6 +32,7 @@ import ExcelImportStock from "./ExcelImportStock";
 interface InventoryTabProps {
   products: ProductItem[];
   stockInRecords: StockInRecord[];
+  onResetAllStock?: () => Promise<void>;
   onUpdateProductStock: (
     productId: string,
     stock25kg?: number,
@@ -51,6 +53,7 @@ interface InventoryTabProps {
 export default function InventoryTab({
   products,
   stockInRecords,
+  onResetAllStock,
   onUpdateProductStock,
   onUpdateProductFull,
   onDeleteProduct,
@@ -536,6 +539,21 @@ export default function InventoryTab({
                 }`}
               >
                 Còn Hàng ({products.length - stats.outOfStockCount})
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN RESET TOÀN BỘ TỒN KHO VỀ 0?\n\nHành động này sẽ đặt số lượng tồn kho của tất cả mặt hàng về 0 và không thể hoàn tác!")) {
+                    if (onResetAllStock) {
+                      await onResetAllStock();
+                      alert("✅ Đã reset toàn bộ tồn kho về 0 thành công!");
+                    }
+                  }
+                }}
+                className="px-2 py-1 rounded-lg transition whitespace-nowrap flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 ml-auto"
+              >
+                <RefreshCcw className="w-3 h-3" />
+                <span>Reset Về 0</span>
               </button>
             </div>
           </div>
@@ -1152,3 +1170,7 @@ export default function InventoryTab({
     </div>
   );
 }
+
+
+
+

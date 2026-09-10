@@ -354,6 +354,32 @@ export default function HomePage() {
   };
 
   // 3.1. THÊM MẶT HÀNG MỚI KÈM SỐ LƯỢNG TỒN BAN ĐẦU
+
+  const handleResetAllStock = async () => {
+    const updated = products.map((p) => ({
+      ...p,
+      stock25kg: 0,
+      stock50kg: 0,
+      updatedAt: Date.now(),
+    }));
+
+    setProducts(updated);
+    try {
+      localStorage.setItem("ban_le_products", JSON.stringify(updated));
+    } catch (e) {}
+
+    if (isFirebaseConfigured() && db) {
+      try {
+        await setDoc(doc(db, "settings", "products"), sanitizeForFirestore({
+          list: updated,
+          updatedAt: Date.now(),
+        }));
+      } catch (err) {
+        console.warn("L?i luu t?n kho l�n Firebase:", err);
+      }
+    }
+  };
+
   const handleAddNewProduct = async (newProd: Omit<ProductItem, "id">): Promise<ProductItem> => {
     const newItem: ProductItem = {
       ...newProd,
@@ -1209,7 +1235,7 @@ export default function HomePage() {
             }`}
           >
             <div className="bg-slate-100/80 rounded-3xl p-4 border border-slate-200 shadow-xl overflow-y-auto max-h-[85vh]">
-              <InventoryTab
+              <InventoryTab onResetAllStock={handleResetAllStock}
                 products={products}
                 stockInRecords={stockInRecords}
                 onUpdateProductStock={handleUpdateProductStock}
@@ -1256,7 +1282,7 @@ export default function HomePage() {
 
             {/* Nội dung Tồn Kho cuộn được */}
             <div className="p-3 sm:p-4 overflow-y-auto flex-1 space-y-2">
-              <InventoryTab
+              <InventoryTab onResetAllStock={handleResetAllStock}
                 products={products}
                 stockInRecords={stockInRecords}
                 onUpdateProductStock={handleUpdateProductStock}
@@ -1282,3 +1308,5 @@ export default function HomePage() {
     </main>
   );
 }
+
+
