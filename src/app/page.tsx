@@ -40,27 +40,27 @@ import {
 } from "lucide-react";
 
 const INITIAL_PRODUCTS: ProductItem[] = [
-  { id: "p1", name: "Cám lợn (heo)", price: 380000, allow25kg: true, allow50kg: true, stock25kg: 25, stock50kg: 40, minStockAlert: 5 },
-  { id: "p2", name: "Cám gà / vịt", price: 350000, allow25kg: true, allow50kg: true, stock25kg: 18, stock50kg: 32, minStockAlert: 5 },
-  { id: "p3", name: "Cám bò / dê", price: 290000, allow25kg: true, allow50kg: true, stock25kg: 10, stock50kg: 20, minStockAlert: 5 },
-  { id: "p4", name: "Gạo ST25", price: 420000, allow25kg: true, allow50kg: true, stock25kg: 30, stock50kg: 50, minStockAlert: 5 },
-  { id: "p5", name: "Gạo Đài Thơm", price: 360000, allow25kg: true, allow50kg: true, stock25kg: 20, stock50kg: 35, minStockAlert: 5 },
-  { id: "p6", name: "Gạo Bắc Hương", price: 340000, allow25kg: true, allow50kg: true, stock25kg: 15, stock50kg: 25, minStockAlert: 5 },
-  { id: "p7", name: "Phân bón NPK", price: 450000, allow25kg: true, allow50kg: true, stock25kg: 12, stock50kg: 28, minStockAlert: 5 },
-  { id: "p8", name: "Đạm Ure", price: 390000, allow25kg: true, allow50kg: true, stock25kg: 14, stock50kg: 22, minStockAlert: 5 },
-  { id: "p9", name: "Phân Lân / Kali", price: 310000, allow25kg: true, allow50kg: true, stock25kg: 8, stock50kg: 18, minStockAlert: 5 },
-  { id: "p10", name: "Ngô hạt / Bột ngô", price: 280000, allow25kg: true, allow50kg: true, stock25kg: 16, stock50kg: 30, minStockAlert: 5 },
-  { id: "p11", name: "Đường cát trắng", price: 520000, allow25kg: true, allow50kg: true, stock25kg: 10, stock50kg: 15, minStockAlert: 5 },
+  { id: "p1", name: "CÃ¡m lá»£n (heo)", price: 380000, allow25kg: true, allow50kg: true, stock25kg: 25, stock50kg: 40, minStockAlert: 5 },
+  { id: "p2", name: "CÃ¡m gÃ  / vá»t", price: 350000, allow25kg: true, allow50kg: true, stock25kg: 18, stock50kg: 32, minStockAlert: 5 },
+  { id: "p3", name: "CÃ¡m bÃ² / dÃª", price: 290000, allow25kg: true, allow50kg: true, stock25kg: 10, stock50kg: 20, minStockAlert: 5 },
+  { id: "p4", name: "Gáº¡o ST25", price: 420000, allow25kg: true, allow50kg: true, stock25kg: 30, stock50kg: 50, minStockAlert: 5 },
+  { id: "p5", name: "Gáº¡o ÄÃ i ThÆ¡m", price: 360000, allow25kg: true, allow50kg: true, stock25kg: 20, stock50kg: 35, minStockAlert: 5 },
+  { id: "p6", name: "Gáº¡o Báº¯c HÆ°Æ¡ng", price: 340000, allow25kg: true, allow50kg: true, stock25kg: 15, stock50kg: 25, minStockAlert: 5 },
+  { id: "p7", name: "PhÃ¢n bÃ³n NPK", price: 450000, allow25kg: true, allow50kg: true, stock25kg: 12, stock50kg: 28, minStockAlert: 5 },
+  { id: "p8", name: "Äáº¡m Ure", price: 390000, allow25kg: true, allow50kg: true, stock25kg: 14, stock50kg: 22, minStockAlert: 5 },
+  { id: "p9", name: "PhÃ¢n LÃ¢n / Kali", price: 310000, allow25kg: true, allow50kg: true, stock25kg: 8, stock50kg: 18, minStockAlert: 5 },
+  { id: "p10", name: "NgÃ´ háº¡t / Bá»t ngÃ´", price: 280000, allow25kg: true, allow50kg: true, stock25kg: 16, stock50kg: 30, minStockAlert: 5 },
+  { id: "p11", name: "ÄÆ°á»ng cÃ¡t tráº¯ng", price: 520000, allow25kg: true, allow50kg: true, stock25kg: 10, stock50kg: 15, minStockAlert: 5 },
 ];
 
 export default function HomePage() {
   const today = getVietnamDate();
 
-  // Mã PIN bảo vệ (1977)
+  // MÃ£ PIN báº£o vá» (1977)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
 
-  // Trạng thái người bán và header
-  const [sellerName, setSellerName] = useState<string>("Hằng");
+  // Tráº¡ng thÃ¡i ngÆ°á»i bÃ¡n vÃ  header
+  const [sellerName, setSellerName] = useState<string>("Háº±ng");
   const [isHeaderExpanded, setIsHeaderExpanded] = useState<boolean>(true);
   const [isSellerDropdownOpen, setIsSellerDropdownOpen] = useState<boolean>(false);
 
@@ -86,19 +86,19 @@ export default function HomePage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(false);
 
-  // Danh mục hàng & Tồn kho
+  // Danh má»¥c hÃ ng & Tá»n kho
   const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
-  // Danh sách phiếu nhập hàng
+  // Danh sÃ¡ch phiáº¿u nháº­p hÃ ng
   const [stockInRecords, setStockInRecords] = useState<StockInRecord[]>([]);
 
-  // Bộ nhớ đệm lưu đơn hàng theo từng ngày: Record<"YYYY-MM-DD", SaleRecord[]>
+  // Bá» nhá» Äá»m lÆ°u ÄÆ¡n hÃ ng theo tá»«ng ngÃ y: Record<"YYYY-MM-DD", SaleRecord[]>
   const [dateRecordsMap, setDateRecordsMap] = useState<Record<string, SaleRecord[]>>({});
-  // Danh sách các đơn lấy nhiều lần (đang lưu giữ / gửi kho)
+  // Danh sÃ¡ch cÃ¡c ÄÆ¡n láº¥y nhiá»u láº§n (Äang lÆ°u giá»¯ / gá»­i kho)
   const [partialRecords, setPartialRecords] = useState<SaleRecord[]>([]);
-  // Danh sách các ngày đã tải từ Firestore để tránh đọc lại
+  // Danh sÃ¡ch cÃ¡c ngÃ y ÄÃ£ táº£i tá»« Firestore Äá» trÃ¡nh Äá»c láº¡i
   const [loadedDates, setLoadedDates] = useState<Set<string>>(new Set());
 
-  // 1. LẮNG NGHE ĐƠN HÀNG HÔM NAY, ĐƠN GỬI KHO, DANH MỤC HÀNG & PHIẾU NHẬP KHO
+  // 1. Láº®NG NGHE ÄÆ N HÃNG HÃM NAY, ÄÆ N Gá»¬I KHO, DANH Má»¤C HÃNG & PHIáº¾U NHáº¬P KHO
   useEffect(() => {
     let unsubscribeToday = () => {};
     let unsubscribePartials = () => {};
@@ -107,7 +107,7 @@ export default function HomePage() {
 
     if (isFirebaseConfigured() && db) {
       try {
-        // A. Lắng nghe đơn hôm nay
+        // A. Láº¯ng nghe ÄÆ¡n hÃ´m nay
         const todayQuery = query(
           collection(db, "sales"),
           where("date", "==", today)
@@ -139,7 +139,7 @@ export default function HomePage() {
           }
         );
 
-        // B. Lắng nghe các đơn lấy nhiều lần
+        // B. Láº¯ng nghe cÃ¡c ÄÆ¡n láº¥y nhiá»u láº§n
         const partialsQuery = query(
           collection(db, "sales"),
           where("isPartialPickup", "==", true)
@@ -163,7 +163,7 @@ export default function HomePage() {
           }
         );
 
-        // C. Lắng nghe danh mục hàng & số lượng tồn kho
+        // C. Láº¯ng nghe danh má»¥c hÃ ng & sá» lÆ°á»£ng tá»n kho
         const prodDocRef = doc(db, "settings", "products");
         unsubscribeProducts = onSnapshot(
           prodDocRef,
@@ -183,7 +183,7 @@ export default function HomePage() {
           }
         );
 
-        // D. Lắng nghe danh sách phiếu nhập kho
+        // D. Láº¯ng nghe danh sÃ¡ch phiáº¿u nháº­p kho
         const stockInQuery = query(collection(db, "stock_in_records"));
         unsubscribeStockIn = onSnapshot(
           stockInQuery,
@@ -223,7 +223,7 @@ export default function HomePage() {
   const loadFromLocalStorage = () => {
     setIsFirebaseConnected(false);
     if (typeof window !== "undefined") {
-      // 1. Đơn bán
+      // 1. ÄÆ¡n bÃ¡n
       const savedSales = localStorage.getItem("ban_le_records");
       if (savedSales) {
         try {
@@ -236,11 +236,11 @@ export default function HomePage() {
           setDateRecordsMap(map);
           setPartialRecords(all.filter((r) => r.isPartialPickup));
         } catch (e) {
-          console.error("Lỗi đọc localStorage sales:", e);
+          console.error("Lá»i Äá»c localStorage sales:", e);
         }
       }
 
-      // 2. Danh mục sản phẩm & tồn kho
+      // 2. Danh má»¥c sáº£n pháº©m & tá»n kho
       const savedProducts = localStorage.getItem("ban_le_products");
       if (savedProducts) {
         try {
@@ -251,7 +251,7 @@ export default function HomePage() {
         } catch (e) {}
       }
 
-      // 3. Phiếu nhập kho
+      // 3. Phiáº¿u nháº­p kho
       const savedStockIn = localStorage.getItem("ban_le_stock_in_records");
       if (savedStockIn) {
         try {
@@ -273,7 +273,7 @@ export default function HomePage() {
     }
   };
 
-  // 2. TẢI THEO YÊU CẦU KHI CHỌN NGÀY CŨ (On-Demand Loading)
+  // 2. Táº¢I THEO YÃU Cáº¦U KHI CHá»N NGÃY CÅ¨ (On-Demand Loading)
   const loadDateOnDemand = useCallback(
     async (dateToLoad: string) => {
       if (dateToLoad === today || loadedDates.has(dateToLoad)) {
@@ -303,7 +303,7 @@ export default function HomePage() {
           }));
           setLoadedDates((prev) => new Set(prev).add(dateToLoad));
         } catch (err) {
-          console.warn(`Lỗi tải dữ liệu ngày ${dateToLoad}:`, err);
+          console.warn(`Lá»i táº£i dá»¯ liá»u ngÃ y ${dateToLoad}:`, err);
         }
       }
     },
@@ -316,7 +316,7 @@ export default function HomePage() {
     }
   }, [selectedDate, today, loadDateOnDemand]);
 
-  // 3. CẬP NHẬT TỒN KHO MẶT HÀNG (KIỂM KÊ)
+  // 3. Cáº¬P NHáº¬T Tá»N KHO Máº¶T HÃNG (KIá»M KÃ)
   const handleUpdateProductStock = async (
     productId: string,
     stock25kg?: number,
@@ -348,12 +348,12 @@ export default function HomePage() {
           updatedAt: Date.now(),
         }));
       } catch (err) {
-        console.warn("Lỗi lưu tồn kho lên Firebase:", err);
+        console.warn("Lá»i lÆ°u tá»n kho lÃªn Firebase:", err);
       }
     }
   };
 
-  // 3.1. THÊM MẶT HÀNG MỚI KÈM SỐ LƯỢNG TỒN BAN ĐẦU
+  // 3.1. THÃM Máº¶T HÃNG Má»I KÃM Sá» LÆ¯á»¢NG Tá»N BAN Äáº¦U
 
   const handleResetAllStock = async () => {
     const updated = products.map((p) => ({
@@ -375,7 +375,7 @@ export default function HomePage() {
           updatedAt: Date.now(),
         }));
       } catch (err) {
-        console.warn("L?i luu t?n kho l�n Firebase:", err);
+        console.warn("Lỗi lưu tồn kho lên Firebase:", err);
       }
     }
   };
@@ -399,13 +399,13 @@ export default function HomePage() {
           updatedAt: Date.now(),
         }));
       } catch (err) {
-        console.warn("Lỗi lưu sản phẩm mới Firebase:", err);
+        console.warn("Lá»i lÆ°u sáº£n pháº©m má»i Firebase:", err);
       }
     }
     return newItem;
   };
 
-  // 3.2. CẬP NHẬT ĐẦY ĐỦ THÔNG TIN MẶT HÀNG (TÊN, GIÁ, LOẠI BAO, TỒN KHO)
+  // 3.2. Cáº¬P NHáº¬T Äáº¦Y Äá»¦ THÃNG TIN Máº¶T HÃNG (TÃN, GIÃ, LOáº I BAO, Tá»N KHO)
   const handleUpdateProductFull = async (
     productId: string,
     updatedData: Partial<ProductItem>
@@ -433,12 +433,12 @@ export default function HomePage() {
           updatedAt: Date.now(),
         }));
       } catch (err) {
-        console.warn("Lỗi lưu sản phẩm lên Firebase:", err);
+        console.warn("Lá»i lÆ°u sáº£n pháº©m lÃªn Firebase:", err);
       }
     }
   };
 
-  // 3.3. XÓA MẶT HÀNG KHỎI DANH MỤC
+  // 3.3. XÃA Máº¶T HÃNG KHá»I DANH Má»¤C
   const handleDeleteProduct = async (productId: string) => {
     const updated = products.filter((p) => p.id !== productId);
     setProducts(updated);
@@ -453,12 +453,12 @@ export default function HomePage() {
           updatedAt: Date.now(),
         }));
       } catch (err) {
-        console.warn("Lỗi xóa sản phẩm Firebase:", err);
+        console.warn("Lá»i xÃ³a sáº£n pháº©m Firebase:", err);
       }
     }
   };
 
-  // 4. TẠO PHIẾU NHẬP HÀNG MỚI (TỰ ĐỘNG TĂNG TỒN KHO)
+  // 4. Táº O PHIáº¾U NHáº¬P HÃNG Má»I (Tá»° Äá»NG TÄNG Tá»N KHO)
   const handleAddStockInRecord = async (newStockIn: Omit<StockInRecord, "id" | "createdAt">) => {
     const recordWithId: StockInRecord = {
       ...newStockIn,
@@ -471,10 +471,10 @@ export default function HomePage() {
         const newDocRef = doc(collection(db, "stock_in_records"));
         recordWithId.id = newDocRef.id;
         setDoc(newDocRef, sanitizeForFirestore(recordWithId)).catch((err) => {
-          console.warn("Lỗi lưu stock_in Firebase:", err);
+          console.warn("Lá»i lÆ°u stock_in Firebase:", err);
         });
       } catch (fbErr) {
-        console.warn("Lỗi docRef stock_in:", fbErr);
+        console.warn("Lá»i docRef stock_in:", fbErr);
       }
     }
 
@@ -485,7 +485,7 @@ export default function HomePage() {
       localStorage.setItem("ban_le_stock_in_records", JSON.stringify([recordWithId, ...list]));
     } catch (e) {}
 
-    // Tự động cộng số lượng bao vào tồn kho của sản phẩm
+    // Tá»± Äá»ng cá»ng sá» lÆ°á»£ng bao vÃ o tá»n kho cá»§a sáº£n pháº©m
     const targetProd = products.find(
       (p) => p.id === newStockIn.productId || p.name === newStockIn.itemName
     );
@@ -498,7 +498,7 @@ export default function HomePage() {
     }
   };
 
-  // 5. HỦY / XÓA PHIẾU NHẬP HÀNG (HOÀN TRẢ TỒN KHO)
+  // 5. Há»¦Y / XÃA PHIáº¾U NHáº¬P HÃNG (HOÃN TRáº¢ Tá»N KHO)
   const handleDeleteStockInRecord = async (id: string, reason: string) => {
     const targetRecord = stockInRecords.find((r) => r.id === id);
     if (!targetRecord) return;
@@ -519,11 +519,11 @@ export default function HomePage() {
           deletedAt: Date.now(),
         }));
       } catch (err) {
-        console.warn("Lỗi update stock_in Firebase:", err);
+        console.warn("Lá»i update stock_in Firebase:", err);
       }
     }
 
-    // Trừ ngược lại số lượng tồn kho đã cộng
+    // Trá»« ngÆ°á»£c láº¡i sá» lÆ°á»£ng tá»n kho ÄÃ£ cá»ng
     const targetProd = products.find(
       (p) => p.id === targetRecord.productId || p.name === targetRecord.itemName
     );
@@ -536,7 +536,7 @@ export default function HomePage() {
     }
   };
 
-  // 6. THÊM GIAO DỊCH BÁN MỚI
+  // 6. THÃM GIAO Dá»CH BÃN Má»I
   const handleAddRecord = async (newRecord: Omit<SaleRecord, "id" | "createdAt">) => {
     setLoading(true);
     const recordWithTime: SaleRecord = {
@@ -551,10 +551,10 @@ export default function HomePage() {
           const newDocRef = doc(collection(db, "sales"));
           recordWithTime.id = newDocRef.id;
           setDoc(newDocRef, sanitizeForFirestore(recordWithTime)).catch((err) => {
-            console.warn("Lỗi đồng bộ Firebase:", err);
+            console.warn("Lá»i Äá»ng bá» Firebase:", err);
           });
         } catch (fbErr) {
-          console.warn("Lỗi khởi tạo docRef Firestore:", fbErr);
+          console.warn("Lá»i khá»i táº¡o docRef Firestore:", fbErr);
         }
       }
 
@@ -573,9 +573,9 @@ export default function HomePage() {
       saveToLocal(recordWithTime);
       setSelectedDate(newRecord.date);
 
-      // Tự động trừ tồn kho khi bán hàng:
-      // - Nếu đơn lấy nhiều lần: chỉ trừ số lượng thực lấy ngay lúc tạo đơn (pickedQuantity)
-      // - Nếu đơn thường: trừ toàn bộ số lượng (quantity)
+      // Tá»± Äá»ng trá»« tá»n kho khi bÃ¡n hÃ ng:
+      // - Náº¿u ÄÆ¡n láº¥y nhiá»u láº§n: chá» trá»« sá» lÆ°á»£ng thá»±c láº¥y ngay lÃºc táº¡o ÄÆ¡n (pickedQuantity)
+      // - Náº¿u ÄÆ¡n thÆ°á»ng: trá»« toÃ n bá» sá» lÆ°á»£ng (quantity)
       const soldProd = products.find((p) => p.name === newRecord.itemName);
       if (soldProd) {
         const deductQty = newRecord.isPartialPickup
@@ -591,7 +591,7 @@ export default function HomePage() {
         }
       }
     } catch (err: any) {
-      console.warn("Lỗi lưu đơn hàng:", err);
+      console.warn("Lá»i lÆ°u ÄÆ¡n hÃ ng:", err);
       setDateRecordsMap((prev) => {
         const currentList = prev[newRecord.date] || [];
         return {
@@ -608,7 +608,7 @@ export default function HomePage() {
     }
   };
 
-  // 6b. THÊM NHIỀU GIAO DỊCH BÁN CÙNG LÚC (BÁN NHIỀU LOẠI)
+  // 6b. THÃM NHIá»U GIAO Dá»CH BÃN CÃNG LÃC (BÃN NHIá»U LOáº I)
   const handleAddMultipleRecords = async (recordsList: Omit<SaleRecord, "id" | "createdAt">[]) => {
     if (!recordsList || recordsList.length === 0) return;
     setLoading(true);
@@ -627,10 +627,10 @@ export default function HomePage() {
             const newDocRef = doc(collection(db, "sales"));
             rec.id = newDocRef.id;
             setDoc(newDocRef, sanitizeForFirestore(rec)).catch((err) => {
-              console.warn("Lỗi đồng bộ Firebase:", err);
+              console.warn("Lá»i Äá»ng bá» Firebase:", err);
             });
           } catch (fbErr) {
-            console.warn("Lỗi khởi tạo docRef Firestore:", fbErr);
+            console.warn("Lá»i khá»i táº¡o docRef Firestore:", fbErr);
           }
         });
       }
@@ -649,7 +649,7 @@ export default function HomePage() {
         setPartialRecords((prev) => [...partialsToAdd, ...prev]);
       }
 
-      // Lưu LocalStorage
+      // LÆ°u LocalStorage
       try {
         const saved = localStorage.getItem("ban_le_records");
         const list: SaleRecord[] = saved ? JSON.parse(saved) : [];
@@ -659,7 +659,7 @@ export default function HomePage() {
 
       setSelectedDate(targetDate);
 
-      // Tự động trừ tồn kho từng mặt hàng
+      // Tá»± Äá»ng trá»« tá»n kho tá»«ng máº·t hÃ ng
       recordsList.forEach((newRecord) => {
         const soldProd = products.find((p) => p.name === newRecord.itemName);
         if (soldProd) {
@@ -677,13 +677,13 @@ export default function HomePage() {
         }
       });
     } catch (err: any) {
-      console.warn("Lỗi lưu nhiều đơn hàng:", err);
+      console.warn("Lá»i lÆ°u nhiá»u ÄÆ¡n hÃ ng:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 7. XỬ LÝ LẤY HÀNG NHIỀU LẦN (TỰ ĐỘNG TRỪ TỒN KHO THEO SỐ LƯỢNG LẤY THỰC TẾ)
+  // 7. Xá»¬ LÃ Láº¤Y HÃNG NHIá»U Láº¦N (Tá»° Äá»NG TRá»ª Tá»N KHO THEO Sá» LÆ¯á»¢NG Láº¤Y THá»°C Táº¾)
   const handleAddPickup = async (recordId: string, pickupQuantity: number, pickupNote?: string) => {
     const autoDate = getVietnamDate();
     const autoTime = getVietnamTime();
@@ -734,7 +734,7 @@ export default function HomePage() {
       saveToLocal(rec);
     }
 
-    // Tự động trừ tồn kho theo số lượng lấy lần này trong thẻ Lấy Nhiều Lần
+    // Tá»± Äá»ng trá»« tá»n kho theo sá» lÆ°á»£ng láº¥y láº§n nÃ y trong tháº» Láº¥y Nhiá»u Láº§n
     if (foundRecord && pickupQuantity > 0) {
       const soldProd = products.find((p) => p.name === foundRecord.itemName);
       if (soldProd) {
@@ -746,7 +746,7 @@ export default function HomePage() {
       }
     }
 
-    // Cập nhật Firebase
+    // Cáº­p nháº­t Firebase
     if (isFirebaseConfigured() && db) {
       try {
         const found = partialRecords.find((r) => r.id === recordId);
@@ -770,12 +770,12 @@ export default function HomePage() {
           await updateDoc(doc(db, "sales", recordId), sanitizeForFirestore(updatePayload));
         }
       } catch (err) {
-        console.warn("Lỗi cập nhật pickup Firestore:", err);
+        console.warn("Lá»i cáº­p nháº­t pickup Firestore:", err);
       }
     }
   };
 
-  // 8. XÓA GIAO DỊCH KÈM LÝ DO (Soft Delete) & HOÀN TRẢ TỒN KHO
+  // 8. XÃA GIAO Dá»CH KÃM LÃ DO (Soft Delete) & HOÃN TRáº¢ Tá»N KHO
   const handleDeleteRecord = async (id: string, reason: string) => {
     const targetDate = selectedDate;
     const currentList = dateRecordsMap[targetDate] || [];
@@ -804,7 +804,7 @@ export default function HomePage() {
       prev.map((r) => (r.id === id ? { ...r, isDeleted: true, deleteReason: reason, deletedAt: Date.now() } : r))
     );
 
-    // Hoàn trả lại số lượng tồn kho thực tế đã trừ khi xóa đơn bán
+    // HoÃ n tráº£ láº¡i sá» lÆ°á»£ng tá»n kho thá»±c táº¿ ÄÃ£ trá»« khi xÃ³a ÄÆ¡n bÃ¡n
     if (targetRecord && !targetRecord.isDeleted) {
       const soldProd = products.find((p) => p.name === targetRecord.itemName);
       if (soldProd) {
@@ -830,12 +830,12 @@ export default function HomePage() {
           deletedAt: Date.now(),
         }));
       } catch (err: any) {
-        console.warn("Lỗi update Firebase:", err);
+        console.warn("Lá»i update Firebase:", err);
       }
     }
   };
 
-  // 9. TẢI DỮ LIỆU ĐỂ XUẤT EXCEL
+  // 9. Táº¢I Dá»® LIá»U Äá» XUáº¤T EXCEL
   const handleFetchExportRecords = useCallback(
     async (
       mode: "range" | "multiday",
@@ -878,7 +878,7 @@ export default function HomePage() {
             return results.filter((r) => !r.isDeleted);
           }
         } catch (err) {
-          console.warn("Lỗi fetch export:", err);
+          console.warn("Lá»i fetch export:", err);
         }
       }
 
@@ -898,7 +898,7 @@ export default function HomePage() {
     return r.pickupStatus === "completed";
   };
 
-  // Thống kê hôm nay
+  // Thá»ng kÃª hÃ´m nay
   const todayRecords = (dateRecordsMap[today] || []).filter(isRecordInSalesBook);
   const todayActiveRecords = todayRecords.filter((r) => !r.isDeleted);
   const todayRevenue = todayActiveRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
@@ -909,12 +909,12 @@ export default function HomePage() {
     .filter((r) => r.bagType === "50kg")
     .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 
-  // Đếm số đơn đang gửi kho
+  // Äáº¿m sá» ÄÆ¡n Äang gá»­i kho
   const pendingPickupsCount = partialRecords.filter(
     (r) => r.isPartialPickup && r.pickupStatus !== "completed" && !r.isDeleted
   ).length;
 
-  // Đếm số mặt hàng sắp hết trong kho
+  // Äáº¿m sá» máº·t hÃ ng sáº¯p háº¿t trong kho
   const lowStockCount = useMemo(() => {
     return products.filter((p) => {
       const s25 = Number(p.stock25kg) || 0;
@@ -945,7 +945,7 @@ export default function HomePage() {
         }`}
       >
         <PlusCircle className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
-        <span className="truncate">{isCompact ? "Bán" : "Nhập Bán"}</span>
+        <span className="truncate">{isCompact ? "BÃ¡n" : "Nháº­p BÃ¡n"}</span>
       </button>
 
       <button
@@ -959,7 +959,7 @@ export default function HomePage() {
       >
         <Layers className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
         <span className="truncate">
-          {isCompact ? `Gửi (${pendingPickupsCount})` : `Gửi Lại (${pendingPickupsCount})`}
+          {isCompact ? `Gá»­i (${pendingPickupsCount})` : `Gá»­i Láº¡i (${pendingPickupsCount})`}
         </span>
       </button>
 
@@ -973,14 +973,14 @@ export default function HomePage() {
         }`}
       >
         <ClipboardList className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
-        <span className="truncate">{isCompact ? `Sổ (${todayActiveRecords.length})` : `Sổ Đơn (${todayActiveRecords.length})`}</span>
+        <span className="truncate">{isCompact ? `Sá» (${todayActiveRecords.length})` : `Sá» ÄÆ¡n (${todayActiveRecords.length})`}</span>
       </button>
     </div>
   );
 
   return (
     <main className="min-h-screen bg-slate-100/70 pb-10 sm:pb-8 text-slate-800">
-      {/* Header Sticky Sáng Cực Gọn */}
+      {/* Header Sticky SÃ¡ng Cá»±c Gá»n */}
       <header className={`bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs transition-all duration-300 py-1`}>
         <div className={`max-w-2xl mx-auto px-2 sm:px-4 flex items-center justify-between transition-all duration-300 h-10 sm:h-12`}>
           <div className="flex items-center gap-2">
@@ -989,7 +989,7 @@ export default function HomePage() {
             </div>
             <div>
               <h1 className={`${isHeaderExpanded ? 'text-xs sm:text-sm' : 'text-[10px]'} font-black tracking-tight text-slate-800 flex items-center gap-1 transition-all`}>
-                SỔ BÁN LẺ
+                Sá» BÃN Láºº
                 <span
                   className={`uppercase font-bold px-1 py-0.2 rounded transition-all ${
                     isHeaderExpanded ? 'text-[9px]' : 'text-[7px]'
@@ -1004,7 +1004,7 @@ export default function HomePage() {
               </h1>
               {isHeaderExpanded && (
                 <p className="text-[9px] text-slate-400">
-                  {getVietnamTodayDisplay()} • Giờ VN (GMT+7)
+                  {getVietnamTodayDisplay()} â¢ Giá» VN (GMT+7)
                 </p>
               )}
             </div>
@@ -1019,7 +1019,7 @@ export default function HomePage() {
           <div className="flex items-center gap-1.5 shrink-0">
             {isHeaderExpanded && (
               <>
-                {/* Chọn Người Bán */}
+                {/* Chá»n NgÆ°á»i BÃ¡n */}
                 <div className="relative">
                   <button
                     type="button"
@@ -1035,7 +1035,7 @@ export default function HomePage() {
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsSellerDropdownOpen(false)}></div>
                       <div className="absolute right-0 top-full mt-1.5 w-32 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 overflow-hidden">
-                        {["Hằng", "Gấm", "Duyên"].map((name) => (
+                        {["Háº±ng", "Gáº¥m", "DuyÃªn"].map((name) => (
                           <button
                             key={name}
                             type="button"
@@ -1060,14 +1060,14 @@ export default function HomePage() {
                   className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white text-[11px] font-bold rounded-xl shadow-2xs transition"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Xuất Excel</span>
+                  <span className="hidden sm:inline">Xuáº¥t Excel</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleLockApp}
                   className="p-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 rounded-xl transition"
-                  title="Khóa ứng dụng"
+                  title="KhÃ³a á»©ng dá»¥ng"
                 >
                   <Lock className="w-3.5 h-3.5" />
                 </button>
@@ -1084,7 +1084,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* THANH CHỌN THẺ NẰM TRONG HEADER (NẾU MỞ RỘNG) */}
+        {/* THANH CHá»N THáºº Náº°M TRONG HEADER (Náº¾U Má» Rá»NG) */}
         {isHeaderExpanded && (
           <div className="max-w-2xl mx-auto px-2 sm:px-4 pb-1 mt-1 animate-fadeIn">
             {renderTabs(false)}
@@ -1092,21 +1092,21 @@ export default function HomePage() {
         )}
       </header>
 
-      {/* Main Container: 2 Cột trên PC */}
+      {/* Main Container: 2 Cá»t trÃªn PC */}
       <div className="max-w-7xl mx-auto px-1.5 sm:px-4 pt-1.5 lg:flex lg:gap-4 lg:items-start">
-        {/* CỘT TRÁI: SỔ BÁN LẺ */}
+        {/* Cá»T TRÃI: Sá» BÃN Láºº */}
         <div className="w-full lg:flex-1 lg:max-w-2xl mx-auto space-y-1.5">
-        {/* NỘI DUNG THẺ */}
+        {/* Ná»I DUNG THáºº */}
         {activeTab === "form" ? (
           <div className="space-y-2.5">
-            {/* Form Tạo Đơn */}
+            {/* Form Táº¡o ÄÆ¡n */}
             <SalesForm 
               onAddRecord={handleAddRecord} 
               seller={sellerName}
               loading={loading} 
             />
 
-            {/* Nút Nhỏ Quản Lý & Nhập Tồn Kho Nằm Dưới Bảng Tạo Đơn (CHỈ HIỆN TRÊN MOBILE) */}
+            {/* NÃºt Nhá» Quáº£n LÃ½ & Nháº­p Tá»n Kho Náº±m DÆ°á»i Báº£ng Táº¡o ÄÆ¡n (CHá» HIá»N TRÃN MOBILE) */}
             <div className="lg:hidden bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
@@ -1114,15 +1114,15 @@ export default function HomePage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-800">Quản Lý & Nhập Tồn Kho</span>
+                    <span className="text-xs font-bold text-slate-800">Quáº£n LÃ½ & Nháº­p Tá»n Kho</span>
                     {lowStockCount > 0 && (
                       <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 animate-pulse">
                         <AlertTriangle className="w-2.5 h-2.5" />
-                        {lowStockCount} hàng sắp hết
+                        {lowStockCount} hÃ ng sáº¯p háº¿t
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-400">Kiểm kê số bao, tạo phiếu nhập hàng mới</p>
+                  <p className="text-[10px] text-slate-400">Kiá»m kÃª sá» bao, táº¡o phiáº¿u nháº­p hÃ ng má»i</p>
                 </div>
               </div>
 
@@ -1132,13 +1132,13 @@ export default function HomePage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-2xs transition shrink-0"
               >
                 <Boxes className="w-3.5 h-3.5" />
-                <span>Xem Tồn Kho</span>
+                <span>Xem Tá»n Kho</span>
               </button>
             </div>
           </div>
         ) : activeTab === "table" ? (
           <div className="space-y-2.5">
-            {/* Banner Tóm Tắt Doanh Số Hôm Nay */}
+            {/* Banner TÃ³m Táº¯t Doanh Sá» HÃ´m Nay */}
             <div className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl p-3 text-white shadow-xs flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-white/15 rounded-lg">
@@ -1146,7 +1146,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="text-[10px] text-emerald-200 font-medium">
-                    Hôm nay ({todayActiveRecords.length} đơn):
+                    HÃ´m nay ({todayActiveRecords.length} ÄÆ¡n):
                   </p>
                   <p className="text-sm sm:text-base font-black">{formatVND(todayRevenue)}</p>
                 </div>
@@ -1165,7 +1165,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Bảng sổ đơn hàng */}
+            {/* Báº£ng sá» ÄÆ¡n hÃ ng */}
             <SalesTable
               records={currentViewRecords}
               stockInRecords={stockInRecords}
@@ -1176,7 +1176,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div>
-            {/* Thẻ Quản Lý Các Đơn Khách Lấy Nhiều Lần */}
+            {/* Tháº» Quáº£n LÃ½ CÃ¡c ÄÆ¡n KhÃ¡ch Láº¥y Nhiá»u Láº§n */}
             <PartialPickupsTab
               records={partialRecords}
               products={products}
@@ -1187,9 +1187,9 @@ export default function HomePage() {
         )}
         </div>
 
-        {/* CỘT PHẢI: QUẢN LÝ TỒN KHO (CHỈ HIỆN TRÊN PC) */}
+        {/* Cá»T PHáº¢I: QUáº¢N LÃ Tá»N KHO (CHá» HIá»N TRÃN PC) */}
         <div className="hidden lg:block lg:w-[450px] xl:w-[500px] shrink-0 sticky top-16">
-          {/* Banner Tồn Kho trên PC */}
+          {/* Banner Tá»n Kho trÃªn PC */}
           <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
@@ -1197,15 +1197,15 @@ export default function HomePage() {
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-slate-800">Quản Lý & Nhập Tồn Kho</span>
+                  <span className="text-sm font-bold text-slate-800">Quáº£n LÃ½ & Nháº­p Tá»n Kho</span>
                   {lowStockCount > 0 && (
                     <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 animate-pulse">
                       <AlertTriangle className="w-2.5 h-2.5" />
-                      {lowStockCount} sắp hết
+                      {lowStockCount} sáº¯p háº¿t
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-400">Kiểm kê lượng bao và tạo phiếu nhập</p>
+                <p className="text-[10px] text-slate-400">Kiá»m kÃª lÆ°á»£ng bao vÃ  táº¡o phiáº¿u nháº­p</p>
               </div>
             </div>
 
@@ -1217,18 +1217,18 @@ export default function HomePage() {
               {isInventoryModalOpen ? (
                 <>
                   <ChevronUp className="w-3.5 h-3.5" />
-                  <span>Thu Gọn</span>
+                  <span>Thu Gá»n</span>
                 </>
               ) : (
                 <>
                   <Boxes className="w-3.5 h-3.5" />
-                  <span>Xem Tồn Kho</span>
+                  <span>Xem Tá»n Kho</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* Accordion Mở Rộng Tồn Kho trên PC */}
+          {/* Accordion Má» Rá»ng Tá»n Kho trÃªn PC */}
           <div
             className={`transition-all duration-300 overflow-hidden ${
               isInventoryModalOpen ? "max-h-[85vh] opacity-100" : "max-h-0 opacity-0"
@@ -1251,7 +1251,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* MODAL QUẢN LÝ & NHẬP TỒN KHO (CHỈ HIỆN TRÊN MOBILE) */}
+      {/* MODAL QUáº¢N LÃ & NHáº¬P Tá»N KHO (CHá» HIá»N TRÃN MOBILE) */}
       {isInventoryModalOpen && (
         <div className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4">
           <div className="bg-slate-100 rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
@@ -1263,10 +1263,10 @@ export default function HomePage() {
                 </div>
                 <div>
                   <h2 className="text-xs sm:text-sm font-black text-slate-800">
-                    QUẢN LÝ & NHẬP LƯỢNG TỒN KHO
+                    QUáº¢N LÃ & NHáº¬P LÆ¯á»¢NG Tá»N KHO
                   </h2>
                   <p className="text-[10px] text-slate-400">
-                    Kiểm kê lượng bao và theo dõi lịch sử nhập hàng
+                    Kiá»m kÃª lÆ°á»£ng bao vÃ  theo dÃµi lá»ch sá»­ nháº­p hÃ ng
                   </p>
                 </div>
               </div>
@@ -1280,7 +1280,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Nội dung Tồn Kho cuộn được */}
+            {/* Ná»i dung Tá»n Kho cuá»n ÄÆ°á»£c */}
             <div className="p-3 sm:p-4 overflow-y-auto flex-1 space-y-2">
               <InventoryTab onResetAllStock={handleResetAllStock}
                 products={products}
@@ -1298,7 +1298,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Modal Xuất Báo Cáo Excel */}
+      {/* Modal Xuáº¥t BÃ¡o CÃ¡o Excel */}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
