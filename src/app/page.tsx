@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { SaleRecord, PickupEvent, ProductItem, StockInRecord } from "@/types";
 import SalesForm from "@/components/SalesForm";
+import InstallBanner from "@/components/InstallBanner";
 import SalesTable from "@/components/SalesTable";
 import PartialPickupsTab from "@/components/PartialPickupsTab";
 import InventoryTab from "@/components/InventoryTab";
@@ -1091,6 +1092,8 @@ export default function HomePage() {
           </div>
         )}
       </header>
+      
+      <InstallBanner />
 
       {/* Main Container: 2 Cột trên PC */}
       <div className="max-w-7xl mx-auto px-1.5 sm:px-4 pt-1.5 lg:flex lg:gap-4 lg:items-start">
