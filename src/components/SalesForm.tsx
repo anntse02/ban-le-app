@@ -312,7 +312,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
 
   // Lượng tồn kho hiện tại của loại bao đang chọn
   const currentStock = bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0);
-  const isOutOfStock = currentStock < 1;
+  const isOutOfStock = false;
 
   // Xác định tên khách cuối cùng
   const finalCustomerName = isRetail
@@ -331,7 +331,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
 
     // Nếu giỏ hàng rỗng, tự thêm món đang chọn trên form
     let itemsToProcess = [...cartItems];
-    if (itemsToProcess.length === 0 && numQty > 0 && finalBagPrice > 0 && !isOutOfStock) {
+    if (itemsToProcess.length === 0 && numQty > 0 && finalBagPrice > 0 ) {
       itemsToProcess.push({
         id: "single_item",
         itemName: selectedItemName.trim(),
@@ -389,7 +389,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
 
   // Hiển thị bảng tạm tính: gồm các món đã thêm + món đang chọn trên form (preview)
   const currentCart = [...cartItems];
-  if (numQty > 0 && finalBagPrice > 0 && !isOutOfStock && currentProduct) {
+  if (numQty > 0 && finalBagPrice > 0  && currentProduct) {
     currentCart.push({
       id: "cart_staging",
       itemName: selectedItemName.trim(),

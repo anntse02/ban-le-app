@@ -140,7 +140,7 @@ export default function InventoryTab({
         return totalBags > 0 && totalBags <= minAlert;
       }
       if (stockFilter === "out_of_stock") {
-        return totalBags === 0;
+        return totalBags <= 0;
       }
       if (stockFilter === "in_stock") {
         return totalBags > 0;
@@ -582,7 +582,7 @@ export default function InventoryTab({
                 const totalBags = s25 + s50;
                 const minAlert = p.minStockAlert !== undefined ? p.minStockAlert : 5;
                 const isLow = totalBags > 0 && totalBags <= minAlert;
-                const isOut = totalBags === 0;
+                const isOut = totalBags <= 0;
 
                 const allow25 = p.allow25kg !== false;
                 const allow50 = p.allow50kg !== false;

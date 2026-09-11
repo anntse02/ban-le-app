@@ -530,8 +530,8 @@ export default function HomePage() {
     if (targetProd) {
       const cur25 = Number(targetProd.stock25kg) || 0;
       const cur50 = Number(targetProd.stock50kg) || 0;
-      const new25 = targetRecord.bagType === "25kg" ? Math.max(0, cur25 - targetRecord.quantity) : cur25;
-      const new50 = targetRecord.bagType === "50kg" ? Math.max(0, cur50 - targetRecord.quantity) : cur50;
+      const new25 = targetRecord.bagType === "25kg" ? cur25 - targetRecord.quantity : cur25;
+      const new50 = targetRecord.bagType === "50kg" ? cur50 - targetRecord.quantity : cur50;
       await handleUpdateProductStock(targetProd.id, new25, new50, targetProd.minStockAlert);
     }
   };
@@ -585,8 +585,8 @@ export default function HomePage() {
         if (deductQty > 0) {
           const cur25 = Number(soldProd.stock25kg) || 0;
           const cur50 = Number(soldProd.stock50kg) || 0;
-          const new25 = newRecord.bagType === "25kg" ? Math.max(0, cur25 - deductQty) : cur25;
-          const new50 = newRecord.bagType === "50kg" ? Math.max(0, cur50 - deductQty) : cur50;
+          const new25 = newRecord.bagType === "25kg" ? cur25 - deductQty : cur25;
+          const new50 = newRecord.bagType === "50kg" ? cur50 - deductQty : cur50;
           handleUpdateProductStock(soldProd.id, new25, new50, soldProd.minStockAlert);
         }
       }
@@ -670,8 +670,8 @@ export default function HomePage() {
           if (deductQty > 0) {
             const cur25 = Number(soldProd.stock25kg) || 0;
             const cur50 = Number(soldProd.stock50kg) || 0;
-            const new25 = newRecord.bagType === "25kg" ? Math.max(0, cur25 - deductQty) : cur25;
-            const new50 = newRecord.bagType === "50kg" ? Math.max(0, cur50 - deductQty) : cur50;
+            const new25 = newRecord.bagType === "25kg" ? cur25 - deductQty : cur25;
+            const new50 = newRecord.bagType === "50kg" ? cur50 - deductQty : cur50;
             handleUpdateProductStock(soldProd.id, new25, new50, soldProd.minStockAlert);
           }
         }
@@ -740,8 +740,8 @@ export default function HomePage() {
       if (soldProd) {
         const cur25 = Number(soldProd.stock25kg) || 0;
         const cur50 = Number(soldProd.stock50kg) || 0;
-        const new25 = foundRecord.bagType === "25kg" ? Math.max(0, cur25 - pickupQuantity) : cur25;
-        const new50 = foundRecord.bagType === "50kg" ? Math.max(0, cur50 - pickupQuantity) : cur50;
+        const new25 = foundRecord.bagType === "25kg" ? cur25 - pickupQuantity : cur25;
+        const new50 = foundRecord.bagType === "50kg" ? cur50 - pickupQuantity : cur50;
         handleUpdateProductStock(soldProd.id, new25, new50, soldProd.minStockAlert);
       }
     }
