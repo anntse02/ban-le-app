@@ -7,23 +7,24 @@ interface PinLockScreenProps {
   onUnlock: () => void;
 }
 
-const CORRECT_PIN = "1977";
-
 export default function PinLockScreen({ onUnlock }: PinLockScreenProps) {
   const [pin, setPin] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-  const handleDigit = useCallback(
-    (digit: string) => {
-      if (pin.length >= 4) return;
-      setError("");
-      const newPin = pin + digit;
-      setPin(newPin);
-
-      if (newPin.length === 4) {
-        if (newPin === CORRECT_PIN) {
+  const verifyPin = useCallback(
+    async (pinToVerify: string) => {
+      setIsVerifying(true);
+      try {
+        const res = await fetch("/api/verify-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin: pinToVerify }),
+        });
+        const data = await res.json();
+        if (data.ok) {
           setIsSuccess(true);
           try {
             localStorage.setItem("ban_le_auth_unlocked", "true");
@@ -39,9 +40,32 @@ export default function PinLockScreen({ onUnlock }: PinLockScreenProps) {
             setIsShaking(false);
           }, 600);
         }
+      } catch {
+        setIsShaking(true);
+        setError("Lỗi kết nối, vui lòng thử lại!");
+        setTimeout(() => {
+          setPin("");
+          setIsShaking(false);
+        }, 600);
+      } finally {
+        setIsVerifying(false);
       }
     },
-    [pin, onUnlock]
+    [onUnlock]
+  );
+
+  const handleDigit = useCallback(
+    (digit: string) => {
+      if (pin.length >= 4 || isVerifying) return;
+      setError("");
+      const newPin = pin + digit;
+      setPin(newPin);
+
+      if (newPin.length === 4) {
+        verifyPin(newPin);
+      }
+    },
+    [pin, isVerifying, verifyPin]
   );
 
   const handleDelete = useCallback(() => {
@@ -127,7 +151,11 @@ export default function PinLockScreen({ onUnlock }: PinLockScreenProps) {
 
         {/* Thông báo lỗi nếu có */}
         <div className="h-5 flex items-center justify-center">
-          {error ? (
+          {isVerifying ? (
+            <p className="text-xs font-bold text-emerald-300 flex items-center gap-1 animate-pulse">
+              <span>Đang kiểm tra...</span>
+            </p>
+          ) : error ? (
             <p className="text-xs font-bold text-red-400 flex items-center gap-1 animate-pulse">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>{error}</span>
