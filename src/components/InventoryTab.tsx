@@ -26,7 +26,6 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 
-import { useToast } from "@/components/Toast";
 import { ParsedExcelRecord } from "@/lib/excelParser";
 import ExcelImportStock from "./ExcelImportStock";
 
@@ -63,7 +62,6 @@ export default function InventoryTab({
   onAddNewProduct,
   loading = false,
 }: InventoryTabProps) {
-  const toast = useToast();
   const [subTab, setSubTab] = useState<"stock" | "stock_in" | "history" | "excel_import">("stock");
 
   // Tìm kiếm & bộ lọc cho Sổ Tồn Kho
@@ -176,7 +174,7 @@ export default function InventoryTab({
 
     const qty = typeof quickQty === "number" ? quickQty : 0;
     if (qty <= 0) {
-      toast.warning("Số lượng nhập thêm phải lớn hơn 0!");
+      alert("Số lượng nhập thêm phải lớn hơn 0!");
       return;
     }
 
@@ -217,7 +215,7 @@ export default function InventoryTab({
       setShowStockInSuccess(true);
       setTimeout(() => setShowStockInSuccess(false), 3000);
     } catch (err: any) {
-      toast.error("Lỗi khi nhập hàng: " + err.message);
+      alert("Lỗi khi nhập hàng: " + err.message);
     } finally {
       setIsSubmittingQuick(false);
     }
@@ -227,11 +225,11 @@ export default function InventoryTab({
   const handleCreateNewProductStockIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName.trim()) {
-      toast.warning("Vui lòng nhập tên hàng mới!");
+      alert("Vui lòng nhập tên hàng mới!");
       return;
     }
     if (!newProdAllow25 && !newProdAllow50) {
-      toast.warning("Vui lòng chọn ít nhất một loại bao (Bao 25kg hoặc Bao 50kg)!");
+      alert("Vui lòng chọn ít nhất một loại bao (Bao 25kg hoặc Bao 50kg)!");
       return;
     }
 
@@ -303,7 +301,7 @@ export default function InventoryTab({
       setShowStockInSuccess(true);
       setTimeout(() => setShowStockInSuccess(false), 3000);
     } catch (err: any) {
-      toast.error("Lỗi khi thêm hàng mới: " + err.message);
+      alert("Lỗi khi thêm hàng mới: " + err.message);
     } finally {
       setIsCreatingNew(false);
     }
@@ -313,7 +311,7 @@ export default function InventoryTab({
   const handleConfirmDeleteStockIn = async () => {
     if (!deletingRecord) return;
     if (!deleteReason.trim()) {
-      toast.warning("Vui lòng nhập lý do hủy phiếu!");
+      alert("Vui lòng nhập lý do hủy phiếu!");
       return;
     }
     setIsDeleting(true);
@@ -322,7 +320,7 @@ export default function InventoryTab({
       setDeletingRecord(null);
       setDeleteReason("");
     } catch (err: any) {
-      toast.error("Lỗi khi xóa phiếu: " + err.message);
+      alert("Lỗi khi xóa phiếu: " + err.message);
     } finally {
       setIsDeleting(false);
     }
@@ -383,9 +381,9 @@ export default function InventoryTab({
     }
 
     if (notFoundNames.size > 0) {
-      toast.success(`Đã nhập ${successCount} mặt hàng. Bỏ qua: ${Array.from(notFoundNames).join(", ")}`);
+      alert(`Đã nhập thành công ${successCount} mặt hàng.\nBỏ qua các hàng hóa không có tên trong hệ thống: ${Array.from(notFoundNames).join(", ")}`);
     } else {
-      toast.success(`Nhập thành công ${successCount} mặt hàng từ Excel!`);
+      alert(`Nhập thành công ${successCount} mặt hàng từ Excel!`);
     }
 
     setSubTab("stock");
@@ -542,6 +540,21 @@ export default function InventoryTab({
               >
                 Còn Hàng ({products.length - stats.outOfStockCount})
               </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN RESET TOÀN BỘ TỒN KHO VỀ 0?\n\nHành động này sẽ đặt số lượng tồn kho của tất cả mặt hàng về 0 và không thể hoàn tác!")) {
+                    if (onResetAllStock) {
+                      await onResetAllStock();
+                      alert("✅ Đã reset toàn bộ tồn kho về 0 thành công!");
+                    }
+                  }
+                }}
+                className="px-2 py-1 rounded-lg transition whitespace-nowrap flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 ml-auto"
+              >
+                <RefreshCcw className="w-3 h-3" />
+                <span>Reset Về 0</span>
+              </button>
             </div>
           </div>
 
@@ -554,25 +567,6 @@ export default function InventoryTab({
             <ArrowDownToLine className="w-4.5 h-4.5" />
             <span>NHẬP THÊM HÀNG VÀO KHO</span>
           </button>
-
-          {/* Nút Reset — đặt riêng, có viền ngăn cách rõ ràng để tránh nhầm */}
-          {onResetAllStock && (
-            <div className="border-t border-dashed border-red-200 pt-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (window.confirm("⚠️ BẠN CÓ CHẮC CHẮN MUỐN RESET TOÀN BỘ TỒN KHO VỀ 0?\n\nHành động này sẽ đặt số lượng tồn kho của tất cả mặt hàng về 0 và không thể hoàn tác!")) {
-                    await onResetAllStock();
-                    toast.success("Đã reset toàn bộ tồn kho về 0!");
-                  }
-                }}
-                className="w-full py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 text-xs font-bold"
-              >
-                <RefreshCcw className="w-3.5 h-3.5" />
-                <span>Reset Toàn Bộ Tồn Kho Về 0</span>
-              </button>
-            </div>
-          )}
 
           {/* DANH SÁCH MẶT HÀNG: ĐÃ BỎ NÚT NHẬP THÊM Ở TỪNG HÀNG */}
           <div className="space-y-2">

@@ -7,61 +7,41 @@ interface PinLockScreenProps {
   onUnlock: () => void;
 }
 
+const CORRECT_PIN = "1977";
+
 export default function PinLockScreen({ onUnlock }: PinLockScreenProps) {
   const [pin, setPin] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [isVerifying, setIsVerifying] = useState<boolean>(false);
-
-  const verifyPin = useCallback(async (newPin: string) => {
-    setIsVerifying(true);
-    try {
-      const res = await fetch("/api/verify-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: newPin }),
-      });
-      if (res.ok) {
-        setIsSuccess(true);
-        try {
-          localStorage.setItem("ban_le_auth_unlocked", "true");
-        } catch (e) {}
-        setTimeout(() => {
-          onUnlock();
-        }, 350);
-      } else {
-        setIsShaking(true);
-        setError("Mã PIN không đúng, vui lòng thử lại!");
-        setTimeout(() => {
-          setPin("");
-          setIsShaking(false);
-        }, 600);
-      }
-    } catch (e) {
-      setIsShaking(true);
-      setError("Lỗi kết nối, thử lại!");
-      setTimeout(() => {
-        setPin("");
-        setIsShaking(false);
-      }, 600);
-    } finally {
-      setIsVerifying(false);
-    }
-  }, [onUnlock]);
 
   const handleDigit = useCallback(
     (digit: string) => {
-      if (pin.length >= 4 || isVerifying) return;
+      if (pin.length >= 4) return;
       setError("");
       const newPin = pin + digit;
       setPin(newPin);
 
       if (newPin.length === 4) {
-        verifyPin(newPin);
+        if (newPin === CORRECT_PIN) {
+          setIsSuccess(true);
+          try {
+            localStorage.setItem("ban_le_auth_unlocked", "true");
+          } catch (e) {}
+          setTimeout(() => {
+            onUnlock();
+          }, 350);
+        } else {
+          setIsShaking(true);
+          setError("Mã PIN không đúng, vui lòng thử lại!");
+          setTimeout(() => {
+            setPin("");
+            setIsShaking(false);
+          }, 600);
+        }
       }
     },
-    [pin, isVerifying, verifyPin]
+    [pin, onUnlock]
   );
 
   const handleDelete = useCallback(() => {
@@ -121,7 +101,7 @@ export default function PinLockScreen({ onUnlock }: PinLockScreenProps) {
               BÁN LẺ & QUẢN LÝ KHO
             </h1>
             <p className="text-xs text-emerald-200/80 font-medium mt-0.5">
-              {isVerifying ? "Đang kiểm tra..." : "Nhập mã PIN để mở khóa ứng dụng"}
+              Nhập mã PIN để mở khóa ứng dụng
             </p>
           </div>
         </div>

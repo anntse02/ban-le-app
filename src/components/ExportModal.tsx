@@ -31,11 +31,6 @@ export default function ExportModal({
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [multiDayInput, setMultiDayInput] = useState("");
-  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [calendarMonth, setCalendarMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
   const [previewRecords, setPreviewRecords] = useState<SaleRecord[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
@@ -43,9 +38,6 @@ export default function ExportModal({
 
   const parsedDays: string[] = useMemo(() => {
     if (mode !== "multiday") return [];
-    // Primary source: calendar picker
-    if (selectedDays.size > 0) return Array.from(selectedDays).sort();
-    // Fallback: text input (backward compat)
     const tokens = multiDayInput.trim().split(/\s+/).filter(Boolean);
     const valid: string[] = [];
     for (const token of tokens) {
@@ -56,7 +48,10 @@ export default function ExportModal({
         continue;
       }
       const ymdMatch = token.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (ymdMatch) { valid.push(token); continue; }
+      if (ymdMatch) {
+        valid.push(token);
+        continue;
+      }
       const dmyDashMatch = token.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
       if (dmyDashMatch) {
         const [, d, m, y] = dmyDashMatch;
@@ -65,7 +60,7 @@ export default function ExportModal({
       }
     }
     return Array.from(new Set(valid)).sort();
-  }, [multiDayInput, selectedDays, mode]);
+  }, [multiDayInput, mode]);
 
   // Tải dữ liệu xem trước khi mở modal hoặc thay đổi khoảng ngày
   useEffect(() => {
@@ -263,117 +258,65 @@ export default function ExportModal({
             <div className="space-y-2">
               <label className="block text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-green-600" />
-                Bấm chọn nhiều ngày từ lịch:
+                Nhập nhiều ngày (cách nhau bằng dấu cách):
               </label>
 
-              {/* Mini calendar navigator */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 space-y-2">
-                {/* Month navigation */}
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const [y, m] = calendarMonth.split("-").map(Number);
-                      const prev = new Date(y, m - 2, 1);
-                      setCalendarMonth(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
-                    }}
-                    className="p-1 hover:bg-slate-200 rounded-lg text-slate-600 transition"
-                  >
-                    ‹
-                  </button>
-                  <span className="text-xs font-bold text-slate-700">
-                    {(() => {
-                      const [y, m] = calendarMonth.split("-").map(Number);
-                      return `Tháng ${m}/${y}`;
-                    })()}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const [y, m] = calendarMonth.split("-").map(Number);
-                      const next = new Date(y, m, 1);
-                      setCalendarMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
-                    }}
-                    className="p-1 hover:bg-slate-200 rounded-lg text-slate-600 transition"
-                  >
-                    ›
-                  </button>
-                </div>
+              <textarea
+                rows={3}
+                value={multiDayInput}
+                onChange={(e) => setMultiDayInput(e.target.value)}
+                placeholder={"VD: 24/08/2026 22/08/2026 20/08/2026\nMỗi ngày cách nhau 1 dấu cách (Space)"}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-green-500 resize-none leading-relaxed"
+              />
 
-                {/* Day grid */}
-                <div className="grid grid-cols-7 gap-0.5">
-                  {["T2","T3","T4","T5","T6","T7","CN"].map(d => (
-                    <div key={d} className="text-center text-[9px] font-bold text-slate-400 py-0.5">{d}</div>
-                  ))}
-                  {(() => {
-                    const [y, m] = calendarMonth.split("-").map(Number);
-                    const firstDay = new Date(y, m - 1, 1).getDay();
-                    const blanks = firstDay === 0 ? 6 : firstDay - 1;
-                    const daysInMonth = new Date(y, m, 0).getDate();
-                    const cells = [];
-                    for (let i = 0; i < blanks; i++) cells.push(<div key={`b${i}`} />);
-                    for (let day = 1; day <= daysInMonth; day++) {
-                      const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                      const isSelected = selectedDays.has(dateStr);
-                      const isToday = dateStr === today;
-                      cells.push(
-                        <button
-                          key={dateStr}
-                          type="button"
-                          onClick={() => {
-                            setSelectedDays(prev => {
-                              const next = new Set(prev);
-                              if (next.has(dateStr)) next.delete(dateStr);
-                              else next.add(dateStr);
-                              return next;
-                            });
-                          }}
-                          className={`text-[10px] font-bold w-full aspect-square rounded-lg transition ${
-                            isSelected
-                              ? "bg-green-600 text-white shadow-sm"
-                              : isToday
-                              ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
-                              : "hover:bg-slate-200 text-slate-700"
-                          }`}
-                        >
-                          {day}
-                        </button>
-                      );
+              {multiDayInput.trim().length > 0 && (
+                <div>
+                  {parsedDays.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-green-700">
+                        ✓ Nhận dạng được {parsedDays.length} ngày:
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {parsedDays.map((d) => (
+                          <span
+                            key={d}
+                            className="inline-flex items-center px-2 py-0.5 bg-green-50 text-green-800 text-[10px] font-bold rounded-lg border border-green-200"
+                          >
+                            {formatVietnamDisplayDate(d)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-red-600 font-semibold">
+                      ✗ Không nhận dạng được ngày hợp lệ. Định dạng: DD/MM/YYYY
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const todayDisplay = today.split("-").reverse().join("/");
+                    const existing = multiDayInput.trim();
+                    if (!existing.includes(todayDisplay)) {
+                      setMultiDayInput(existing ? existing + " " + todayDisplay : todayDisplay);
                     }
-                    return cells;
-                  })()}
-                </div>
+                  }}
+                  className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition"
+                >
+                  + Hôm Nay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMultiDayInput("")}
+                  className="py-1 px-2.5 bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold rounded-lg transition border border-red-200"
+                >
+                  Xóa hết
+                </button>
               </div>
-
-              {/* Summary of selected days */}
-              {selectedDays.size > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-green-700">✓ Đã chọn {selectedDays.size} ngày:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from(selectedDays).sort().map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setSelectedDays(prev => { const n = new Set(prev); n.delete(d); return n; })}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-800 text-[10px] font-bold rounded-lg border border-green-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition"
-                      >
-                        {formatVietnamDisplayDate(d)} ×
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDays(new Set())}
-                    className="text-[10px] text-red-600 hover:underline font-semibold"
-                  >
-                    Xóa tất cả
-                  </button>
-                </div>
-              )}
-
-              {selectedDays.size === 0 && (
-                <p className="text-[10px] text-slate-400 font-medium">Bấm vào ngày trên lịch để chọn. Bấm lại để bỏ chọn.</p>
-              )}
             </div>
           )}
 
