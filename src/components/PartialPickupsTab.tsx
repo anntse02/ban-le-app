@@ -13,6 +13,7 @@ import {
   Layers,
   Search,
 } from "lucide-react";
+import { useToast } from "@/components/Toast";
 
 interface PartialPickupsTabProps {
   records: SaleRecord[];
@@ -26,6 +27,7 @@ export default function PartialPickupsTab({
   products = [],
   onAddPickup,
 }: PartialPickupsTabProps) {
+  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState("");
 
   // State cho form lấy hàng của từng đơn
@@ -59,11 +61,11 @@ export default function PartialPickupsTab({
     const remaining = Math.max(0, (rec.quantity || 0) - (rec.pickedQuantity || 0));
 
     if (qty <= 0) {
-      alert("Số lượng bao lấy phải lớn hơn 0!");
+      toast.warning("Số lượng bao lấy phải lớn hơn 0!");
       return;
     }
     if (qty > remaining) {
-      alert(`Số lượng lấy (${qty} bao) vượt quá số bao còn lại (${remaining} bao)!`);
+      toast.warning(`Số lượng lấy (${qty} bao) vượt quá số bao còn lại (${remaining} bao)!`);
       return;
     }
 
@@ -72,7 +74,7 @@ export default function PartialPickupsTab({
     if (prod) {
       const curStock = rec.bagType === "25kg" ? (prod.stock25kg ?? 0) : (prod.stock50kg ?? 0);
       if (qty > curStock) {
-        alert(`Số lượng lấy (${qty} bao) vượt quá lượng tồn kho thực tế hiện tại (${curStock} bao)! Vui lòng kiểm tra lại kho.`);
+        toast.warning(`Số lượng lấy (${qty} bao) vượt quá tồn kho hiện tại (${curStock} bao)!`);
         return;
       }
     }
@@ -85,7 +87,7 @@ export default function PartialPickupsTab({
       setPickupInputMap((prev) => ({ ...prev, [rec.id!]: "" }));
       setPickupNoteMap((prev) => ({ ...prev, [rec.id!]: "" }));
     } catch (e: any) {
-      alert("Lỗi khi xác nhận lấy hàng: " + e.message);
+      toast.error("Lỗi khi xác nhận lấy hàng: " + e.message);
     } finally {
       setSubmittingId(null);
     }

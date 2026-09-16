@@ -1,6 +1,42 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useToast } from "@/components/Toast";
+import { SaleRecord, BagType, ProductItem, PaymentStatus, PickupEvent } from "@/types";
+import { getVietnamDate, getVietnamTime, getVietnamTodayDisplay } from "@/lib/dateUtils";
+import {
+  formatCurrencyVND,
+  formatNumberVN,
+  formatCurrencyInput,
+  parseCurrencyInput,
+  parseQuantityInput,
+} from "@/lib/formatters";
+import CustomerModal from "@/components/CustomerModal";
+import { db, isFirebaseConfigured, sanitizeForFirestore } from "@/lib/firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import {
+  PlusCircle,
+  CheckCircle2,
+  Settings,
+  Trash2,
+  Plus,
+  X,
+  Users,
+  Layers,
+  Package,
+  AlertTriangle,
+} from "lucide-react";
+
+interface SalesFormProps {
+  onAddRecord: (record: Omit<SaleRecord, "id" | "createdAt">) => Promise<void>;
+  loading?: boolean;
+  seller: string;
+}
+
+se client";
+
+import React, { useState, useEffect } from "react";
+import { useToast } from "@/components/Toast";
 import { SaleRecord, BagType, ProductItem, PaymentStatus, PickupEvent } from "@/types";
 import { getVietnamDate, getVietnamTime, getVietnamTodayDisplay } from "@/lib/dateUtils";
 import {
@@ -65,6 +101,7 @@ export const getBasePriceKg = (basePrice50kg: number, targetBagType: string): nu
 };
 
 export default function SalesForm({ onAddRecord, loading = false, seller }: SalesFormProps) {
+  const toast = useToast();
 
   // Khách hàng (3 ô: Khách lẻ mặc định | Bảng khách quen ở giữa | Nhập tên ở cuối)
   const [isRetail, setIsRetail] = useState<boolean>(true);
@@ -213,11 +250,11 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
     const updated = products.map((p) => {
       if (p.id === id) {
         if (field === "allow25kg" && !value && p.allow50kg === false) {
-          alert("Mỗi mặt hàng phải có ít nhất 1 loại bao (25kg hoặc 50kg)!");
+          toast.warning("Mỗi mặt hàng phải có ít nhất 1 loại bao (25kg hoặc 50kg)!");
           return p;
         }
         if (field === "allow50kg" && !value && p.allow25kg === false) {
-          alert("Mỗi mặt hàng phải có ít nhất 1 loại bao (25kg hoặc 50kg)!");
+          toast.warning("Mỗi mặt hàng phải có ít nhất 1 loại bao (25kg hoặc 50kg)!");
           return p;
         }
 
@@ -262,7 +299,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
 
   const handleDeleteProduct = (id: string) => {
     if (products.length <= 1) {
-      alert("Cần giữ ít nhất 1 mặt hàng trong danh sách!");
+      toast.warning("Cần giữ ít nhất 1 mặt hàng trong danh sách!");
       return;
     }
     const updated = products.filter((p) => p.id !== id);
@@ -343,7 +380,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
     }
 
     if (itemsToProcess.length === 0) {
-      alert("Vui lòng chọn ít nhất một mặt hàng!");
+      toast.warning("Vui lòng chọn ít nhất một mặt hàng!");
       return;
     }
 

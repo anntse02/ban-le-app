@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ArrowDownToLine,
 } from "lucide-react";
+import { useToast } from "@/components/Toast";
 
 interface SalesTableProps {
   records: SaleRecord[];
@@ -47,6 +48,7 @@ export default function SalesTable({
   selectedDate,
   onDateChange,
 }: SalesTableProps) {
+  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
@@ -153,7 +155,7 @@ export default function SalesTable({
   const handleConfirmDelete = async () => {
     if (!deletingRecord || !deletingRecord.id) return;
     if (!deleteReason.trim()) {
-      alert("Vui lòng nhập lý do xóa đơn hàng!");
+      toast.warning("Vui lòng nhập lý do xóa đơn hàng!");
       return;
     }
 
@@ -163,7 +165,7 @@ export default function SalesTable({
       setDeletingRecord(null);
       setDeleteReason("");
     } catch (e: any) {
-      alert("Lỗi khi xóa: " + e.message);
+      toast.error("Lỗi khi xóa: " + e.message);
     } finally {
       setIsDeleting(false);
     }
