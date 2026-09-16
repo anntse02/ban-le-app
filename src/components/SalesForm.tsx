@@ -649,25 +649,15 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
                 value={quantity === "" ? "" : quantity}
                 onChange={(e) => {
                   const val = parseQuantityInput(e.target.value);
-                  const maxAllowed = Math.floor(currentStock);
-                  if (typeof val === "number" && val > maxAllowed) {
-                    setQuantity(maxAllowed);
-                  } else {
-                    setQuantity(val);
-                  }
+                  setQuantity(val);
                 }}
                 className="w-full min-w-0 bg-slate-50 text-base font-black text-center text-slate-900 focus:bg-white focus:outline-none transition"
                 required
               />
               <button
                 type="button"
-                disabled={numQty + 1 > Math.floor(currentStock)}
-                onClick={() => setQuantity((prev) => Math.min(Math.floor(currentStock), (Number(prev) || 0) + 1))}
-                className={`w-10 sm:w-11 font-black text-xl flex items-center justify-center select-none transition border-l border-slate-300 shrink-0 ${
-                  numQty + 1 > Math.floor(currentStock)
-                    ? "bg-slate-50 text-slate-300 cursor-not-allowed"
-                    : "bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 active:scale-95"
-                }`}
+                onClick={() => setQuantity((prev) => (Number(prev) || 0) + 1)}
+                className="w-10 sm:w-11 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-black text-xl flex items-center justify-center select-none transition border-l border-slate-300 shrink-0 active:scale-95"
               >
                 +
               </button>
