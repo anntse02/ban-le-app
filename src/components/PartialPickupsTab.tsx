@@ -69,16 +69,6 @@ export default function PartialPickupsTab({
       return;
     }
 
-    // Kiểm tra tồn kho hiện có
-    const prod = products.find((p) => p.name === rec.itemName);
-    if (prod) {
-      const curStock = rec.bagType === "25kg" ? (prod.stock25kg ?? 0) : (prod.stock50kg ?? 0);
-      if (qty > curStock) {
-        toast.warning(`Số lượng lấy (${qty} bao) vượt quá lượng tồn kho thực tế hiện tại (${curStock} bao)! Vui lòng kiểm tra lại kho.`);
-        return;
-      }
-    }
-
     setSubmittingId(rec.id);
     try {
       const note = pickupNoteMap[rec.id] || "";
