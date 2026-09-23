@@ -730,16 +730,35 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
               <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200 text-xs animate-fadeIn">
                 <span className="text-slate-600 font-semibold truncate">Lần này lấy:</span>
                 <div className="flex items-center gap-1 shrink-0">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={firstPickupQty === 0 ? "" : firstPickupQty}
-                    onChange={(e) => {
-                      const q = parseQuantityInput(e.target.value, numQty);
-                      setFirstPickupQty(typeof q === "number" ? q : 0);
-                    }}
-                    className="w-12 sm:w-14 h-7 px-1 text-center text-xs font-black bg-white border border-slate-300 rounded-xl outline-none focus:border-green-500"
-                  />
+                  <div className="flex items-stretch h-7 rounded-xl overflow-hidden border border-slate-300 bg-white shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setFirstPickupQty((prev) => Math.max(0, (Number(prev) || 0) - 1))}
+                      className="w-7 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-black text-sm flex items-center justify-center select-none transition border-r border-slate-300 shrink-0 active:scale-95"
+                      title="Giảm số lượng lấy lần này"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={firstPickupQty === 0 ? "" : firstPickupQty}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const q = parseQuantityInput(e.target.value, numQty);
+                        setFirstPickupQty(typeof q === "number" ? q : 0);
+                      }}
+                      className="w-9 sm:w-10 text-center text-xs font-black bg-white outline-none placeholder:text-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFirstPickupQty((prev) => (numQty > 0 ? Math.min(numQty, (Number(prev) || 0) + 1) : (Number(prev) || 0) + 1))}
+                      className="w-7 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-black text-sm flex items-center justify-center select-none transition border-l border-slate-300 shrink-0 active:scale-95"
+                      title="Tăng số lượng lấy lần này"
+                    >
+                      +
+                    </button>
+                  </div>
                   <span className="text-slate-500 font-bold">/ {numQty}</span>
                 </div>
               </div>
