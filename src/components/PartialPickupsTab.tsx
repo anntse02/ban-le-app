@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { SaleRecord, ProductItem } from "@/types";
 import { formatVietnamDisplayDate } from "@/lib/dateUtils";
-import { formatCurrencyVND, formatNumberVN, parseQuantityInput } from "@/lib/formatters";
+import { formatCurrencyVND, formatNumberVN, parseQuantityInput, parseQuantityNumber } from "@/lib/formatters";
 import {
   Package,
   UserCheck,
@@ -57,7 +57,7 @@ export default function PartialPickupsTab({
   const handleConfirmPickup = async (rec: SaleRecord) => {
     if (!rec.id) return;
     const inputVal = pickupInputMap[rec.id];
-    const qty = typeof inputVal === "number" ? inputVal : 1;
+    const qty = typeof inputVal === "number" ? inputVal : parseQuantityNumber(inputVal || 1);
     const remaining = Math.max(0, (rec.quantity || 0) - (rec.pickedQuantity || 0));
 
     if (qty <= 0) {
@@ -150,16 +150,20 @@ export default function PartialPickupsTab({
                     {rec.time && <span className="text-[11px] text-slate-400">{rec.time}</span>}
 
                     <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-100 text-amber-800 border border-amber-200">
-                      ⏳ Còn gửi {remainingQty} bao
+                      ⏳ Còn gửi {formatNumberVN(remainingQty)} bao
                     </span>
 
                     {rec.paymentStatus === "unpaid" ? (
                       <span className="px-1.5 py-0.5 rounded font-black text-[10px] bg-red-100 text-red-700 border border-red-200">
                         Chưa thu
                       </span>
+                    ) : rec.paymentMethod === "transfer" ? (
+                      <span className="px-1.5 py-0.5 rounded font-bold text-[10px] bg-blue-100 text-blue-800 border border-blue-200">
+                        Đã thu (CK)
+                      </span>
                     ) : (
                       <span className="px-1.5 py-0.5 rounded font-bold text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        Đã thu
+                        Đã thu (TM)
                       </span>
                     )}
                   </div>
@@ -217,13 +221,13 @@ export default function PartialPickupsTab({
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-slate-600">
-                      📦 Mua: <strong className="text-slate-900">{totalQty} bao</strong>
+                      📦 Mua: <strong className="text-slate-900">{formatNumberVN(totalQty)} bao</strong>
                     </span>
                     <span className="text-emerald-700">
-                      Đã lấy: <strong>{pickedQty} bao</strong>
+                      Đã lấy: <strong>{formatNumberVN(pickedQty)} bao</strong>
                     </span>
                     <span className="text-amber-700">
-                      Còn lại: <strong>{remainingQty} bao</strong>
+                      Còn lại: <strong>{formatNumberVN(remainingQty)} bao</strong>
                     </span>
                   </div>
 
@@ -253,7 +257,7 @@ export default function PartialPickupsTab({
                             Lần {eIdx + 1}: {formatVietnamDisplayDate(event.date)} {event.time || ""}
                           </span>
                           <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            + {event.quantity} bao
+                            + {formatNumberVN(event.quantity)} bao
                           </span>
                         </div>
                       ))}
@@ -271,10 +275,11 @@ export default function PartialPickupsTab({
                       <button
                         type="button"
                         onClick={() => {
-                          const cur = Number(currentInput) || 1;
+                          const cur = parseQuantityNumber(currentInput) || 1;
+                          const next = cur % 1 !== 0 ? Math.max(0.5, cur - 1) : (cur === 1 ? 0.5 : cur - 1);
                           setPickupInputMap((prev) => ({
                             ...prev,
-                            [rec.id!]: Math.max(1, cur - 1),
+                            [rec.id!]: formatNumberVN(next),
                           }));
                         }}
                         className="w-9 h-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-lg flex items-center justify-center select-none"
@@ -283,7 +288,7 @@ export default function PartialPickupsTab({
                       </button>
                       <input
                         type="text"
-                        inputMode="numeric"
+                        inputMode="decimal"
                         value={currentInput}
                         onChange={(e) => {
                           const val = parseQuantityInput(e.target.value, remainingQty);
@@ -297,10 +302,11 @@ export default function PartialPickupsTab({
                       <button
                         type="button"
                         onClick={() => {
-                          const cur = Number(currentInput) || 0;
+                          const cur = parseQuantityNumber(currentInput) || 0;
+                          const next = cur === 0.5 ? 1 : Math.min(remainingQty, cur + 1);
                           setPickupInputMap((prev) => ({
                             ...prev,
-                            [rec.id!]: Math.min(remainingQty, cur + 1),
+                            [rec.id!]: formatNumberVN(next),
                           }));
                         }}
                         className="w-9 h-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-lg flex items-center justify-center select-none"

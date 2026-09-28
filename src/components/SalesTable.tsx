@@ -39,7 +39,7 @@ interface ItemSummary {
   totalRevenue: number;
 }
 
-type FilterTab = "all" | "Hằng" | "Gấm" | "Duyên" | "paid" | "unpaid" | "partial";
+type FilterTab = "all" | "Hằng" | "Gấm" | "Duyên" | "paid" | "transfer" | "unpaid" | "partial";
 
 export default function SalesTable({
   records,
@@ -69,6 +69,7 @@ export default function SalesTable({
   const countGam = records.filter((r) => r.seller === "Gấm" && !r.isDeleted).length;
   const countDuyen = records.filter((r) => r.seller === "Duyên" && !r.isDeleted).length;
   const countPaid = records.filter((r) => r.paymentStatus !== "unpaid" && !r.isDeleted).length;
+  const countTransfer = records.filter((r) => r.paymentStatus !== "unpaid" && r.paymentMethod === "transfer" && !r.isDeleted).length;
   const countUnpaid = records.filter((r) => r.paymentStatus === "unpaid" && !r.isDeleted).length;
   const countPartial = records.filter((r) => r.isPartialPickup && !r.isDeleted).length;
 
@@ -79,6 +80,7 @@ export default function SalesTable({
     else if (activeFilter === "Gấm") matchesFilter = rec.seller === "Gấm";
     else if (activeFilter === "Duyên") matchesFilter = rec.seller === "Duyên";
     else if (activeFilter === "paid") matchesFilter = rec.paymentStatus !== "unpaid";
+    else if (activeFilter === "transfer") matchesFilter = rec.paymentStatus !== "unpaid" && rec.paymentMethod === "transfer";
     else if (activeFilter === "unpaid") matchesFilter = rec.paymentStatus === "unpaid";
     else if (activeFilter === "partial") matchesFilter = !!rec.isPartialPickup;
 
@@ -246,7 +248,7 @@ export default function SalesTable({
           </div>
           <div>
             <span className="text-slate-500">Tổng xuất: </span>
-            <span className="font-bold text-slate-800">{totalBagsDay} bao</span>
+            <span className="font-bold text-slate-800">{formatNumberVN(totalBagsDay)} bao</span>
           </div>
         </div>
 
@@ -329,6 +331,20 @@ export default function SalesTable({
             >
               <span>✓ Đã thu</span>
               <span className="font-bold">({countPaid})</span>
+            </button>
+
+            {/* Nút ĐÃ THU CHUYỂN KHOẢN */}
+            <button
+              type="button"
+              onClick={() => setActiveFilter("transfer")}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1 ${
+                activeFilter === "transfer"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200"
+              }`}
+            >
+              <span>💳 CK</span>
+              <span className="font-bold">({countTransfer})</span>
             </button>
 
             {/* Nút CHƯA THU */}
@@ -470,7 +486,7 @@ export default function SalesTable({
                       if (total25 > 0) {
                         totalParts.push(
                           <span key="t25" className="inline-flex items-baseline">
-                            <span className="font-extrabold text-slate-900">{total25}</span>
+                            <span className="font-extrabold text-slate-900">{formatNumberVN(total25)}</span>
                             <span className="text-[10px] text-slate-500 font-semibold lowercase ml-0.5">x25</span>
                           </span>
                         );
@@ -478,7 +494,7 @@ export default function SalesTable({
                       if (total50 > 0) {
                         totalParts.push(
                           <span key="t50" className="inline-flex items-baseline">
-                            <span className="font-extrabold text-slate-900">{total50}</span>
+                            <span className="font-extrabold text-slate-900">{formatNumberVN(total50)}</span>
                             <span className="text-[10px] text-slate-500 font-semibold lowercase ml-0.5">x50</span>
                           </span>
                         );
@@ -490,10 +506,10 @@ export default function SalesTable({
                             TỔNG CỘNG
                           </td>
                           <td className="py-2.5 text-center text-emerald-800">
-                            {total25}
+                            {formatNumberVN(total25)}
                           </td>
                           <td className="py-2.5 text-center text-teal-800">
-                            {total50}
+                            {formatNumberVN(total50)}
                           </td>
                           <td className="py-2.5 text-center text-slate-900 text-xs">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded-lg border border-slate-300 shadow-2xs">
@@ -505,7 +521,7 @@ export default function SalesTable({
                                   </React.Fragment>
                                 ))
                               ) : (
-                                <span>{totalBagsDay} bao</span>
+                                <span>{formatNumberVN(totalBagsDay)} bao</span>
                               )}
                             </span>
                           </td>
@@ -592,9 +608,13 @@ export default function SalesTable({
                             <span className="ml-1 px-1.5 py-0.2 rounded font-black text-[10px] bg-red-100 text-red-700 border border-red-200">
                               Chưa thu
                             </span>
+                          ) : rec.paymentMethod === "transfer" ? (
+                            <span className="ml-1 px-1.5 py-0.2 rounded font-bold text-[10px] bg-blue-100 text-blue-800 border border-blue-200">
+                              💳 Đã thu (CK)
+                            </span>
                           ) : (
                             <span className="ml-1 px-1.5 py-0.2 rounded font-bold text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              Đã thu
+                              ✓ Đã thu (TM)
                             </span>
                           )
                         )}
@@ -658,7 +678,7 @@ export default function SalesTable({
                         )}
 
                         <p className="text-xs text-slate-500">
-                          Số lượng: <span className="font-bold text-slate-800">{rec.quantity} bao</span> ×{" "}
+                          Số lượng: <span className="font-bold text-slate-800">{formatNumberVN(rec.quantity)} bao</span> ×{" "}
                           {formatNumberVN(rec.unitPrice)} đ/bao
                         </p>
 
@@ -666,11 +686,11 @@ export default function SalesTable({
                           <div className="pt-0.5">
                             {rec.pickupStatus === "completed" ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
-                                📦 Đã lấy đủ ({rec.pickedQuantity || rec.quantity}/{rec.quantity} bao)
+                                📦 Đã lấy đủ ({formatNumberVN(rec.pickedQuantity || rec.quantity)}/{formatNumberVN(rec.quantity)} bao)
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                ⏳ Đang gửi kho (Đã lấy: {rec.pickedQuantity || 0}/{rec.quantity} bao)
+                                ⏳ Đang gửi kho (Đã lấy: {formatNumberVN(rec.pickedQuantity || 0)}/{formatNumberVN(rec.quantity)} bao)
                               </span>
                             )}
                           </div>
@@ -691,7 +711,7 @@ export default function SalesTable({
                                   <span>
                                     • Lần {eIdx + 1}: {formatVietnamDisplayDate(event.date)} {event.time || ""}
                                   </span>
-                                  <strong className="text-emerald-700 font-bold">+{event.quantity} bao</strong>
+                                  <strong className="text-emerald-700 font-bold">+{formatNumberVN(event.quantity)} bao</strong>
                                 </div>
                               ))}
                             </div>

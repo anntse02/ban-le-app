@@ -105,7 +105,11 @@ export async function generateSalesReportExcel(
     }
 
     const isUnpaid = record.paymentStatus === "unpaid";
-    const statusText = isUnpaid ? "Chưa thu" : "Đã thu";
+    const statusText = isUnpaid
+      ? "Chưa thu"
+      : record.paymentMethod === "transfer"
+      ? "Đã thu (CK)"
+      : "Đã thu (TM)";
 
     const row = salesSheet.addRow([
       index + 1,

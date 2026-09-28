@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/Toast";
-import { SaleRecord, BagType, ProductItem, PaymentStatus, PickupEvent } from "@/types";
+import { SaleRecord, BagType, ProductItem, PaymentStatus, PickupEvent, PaymentMethod } from "@/types";
 import { getVietnamDate, getVietnamTime, getVietnamTodayDisplay } from "@/lib/dateUtils";
 import {
   formatCurrencyVND,
@@ -10,6 +10,7 @@ import {
   formatCurrencyInput,
   parseCurrencyInput,
   parseQuantityInput,
+  parseQuantityNumber,
 } from "@/lib/formatters";
 import CustomerModal from "@/components/CustomerModal";
 import { db, isFirebaseConfigured, sanitizeForFirestore } from "@/lib/firebase";
@@ -90,11 +91,12 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
   const [unitPrice, setUnitPrice] = useState<number | string>(0); 
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [note, setNote] = useState<string>("");
 
   // Khách lấy hàng nhiều lần (Gửi kho)
   const [isPartialPickup, setIsPartialPickup] = useState<boolean>(false);
-  const [firstPickupQty, setFirstPickupQty] = useState<number>(1);
+  const [firstPickupQty, setFirstPickupQty] = useState<number | string>(1);
 
   const [showSuccessToast, setShowSuccessToast] = useState<boolean>(false);
 
@@ -306,11 +308,11 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
     }
   };
 
-  const numQty = typeof quantity === "number" ? quantity : 0;
-  const numPrice = typeof unitPrice === "number" ? unitPrice : 0;
+  const numQty = parseQuantityNumber(quantity);
+  const numPrice = typeof unitPrice === "number" ? unitPrice : (parseFloat(String(unitPrice).replace(/,/g, ".")) || 0);
   const bagWeight = bagType === "25kg" ? 25 : 50;
   const finalBagPrice = numPrice * bagWeight;
-  const totalPrice = numQty * finalBagPrice;
+  const totalPrice = Math.round(numQty * finalBagPrice);
 
   // Lượng tồn kho hiện tại của loại bao đang chọn
   const currentStock = bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0);
@@ -352,7 +354,24 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
     for (const item of itemsToProcess) {
       let partialData: Partial<SaleRecord> = { isPartialPickup: false };
       if (isPartialPickup) {
-         partialData = { isPartialPickup: true };
+        const initialPicked = Math.min(item.quantity, Math.max(0, parseQuantityNumber(firstPickupQty)));
+        const isDone = initialPicked >= item.quantity;
+        const historyItem: PickupEvent = {
+          id: "pick_" + Date.now(),
+          date: autoDate,
+          time: autoTime,
+          quantity: initialPicked,
+          note: "Lấy lần đầu khi tạo đơn",
+          createdAt: Date.now(),
+        };
+
+        partialData = {
+          isPartialPickup: true,
+          pickupStatus: isDone ? "completed" : "pending",
+          pickedQuantity: initialPicked,
+          pickupHistory: initialPicked > 0 ? [historyItem] : [],
+          ...(isDone ? { completedAt: Date.now() } : {}),
+        };
       }
       await onAddRecord({
         date: autoDate,
@@ -365,7 +384,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
         unitPrice: item.unitPrice * (item.bagType === "25kg" ? 25 : 50),
         totalPrice: item.totalPrice,
         paymentStatus,
-        paymentMethod: "cash",
+        paymentMethod: paymentStatus === "paid" ? paymentMethod : "cash",
         note: note.trim(),
         ...partialData,
       });
@@ -376,6 +395,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
     setSelectedFrequentCustomer("");
     setCustomCustomerInput("");
     setPaymentStatus("paid");
+    setPaymentMethod("cash");
     setNote("");
     setIsPartialPickup(false);
     setFirstPickupQty(1);
@@ -630,15 +650,42 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
           {/* Cụm nút Số Lượng (Tự động xóa số 0 đầu: VD 05 -> 5) */}
           <div className="min-w-0">
             <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-600">Số lượng (Bao):</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-600">Số lượng:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cur = parseQuantityNumber(quantity);
+                    const hasHalf = Math.abs((cur % 1) - 0.5) < 0.01;
+                    if (hasHalf) {
+                      setQuantity(formatNumberVN(Math.max(0.5, cur - 0.5)));
+                    } else {
+                      setQuantity(formatNumberVN(cur + 0.5));
+                    }
+                  }}
+                  className={`px-1.5 py-0.2 rounded-md text-[10px] font-black border transition active:scale-95 ${
+                    Math.abs((parseQuantityNumber(quantity) % 1) - 0.5) < 0.01
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                  }`}
+                  title="Thêm hoặc bớt nửa bao (+0,5)"
+                >
+                  + 0,5
+                </button>
+              </div>
               <span className={`text-[10px] font-bold ${(bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0)) <= 0 ? "text-red-600" : "text-emerald-700"}`}>
-                Còn: {bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0)} bao
+                Còn: {formatNumberVN(bagType === "25kg" ? (currentProduct?.stock25kg ?? 0) : (currentProduct?.stock50kg ?? 0))} bao
               </span>
             </div>
             <div className="flex items-stretch h-11 rounded-2xl overflow-hidden border border-slate-300 min-w-0">
               <button
                 type="button"
-                onClick={() => setQuantity((prev) => Math.max(1, (Number(prev) || 1) - 1))}
+                onClick={() => {
+                  const cur = parseQuantityNumber(quantity);
+                  if (cur <= 0.5) return;
+                  const next = cur % 1 !== 0 ? Math.max(0.5, cur - 1) : (cur === 1 ? 0.5 : cur - 1);
+                  setQuantity(formatNumberVN(next));
+                }}
                 className="w-10 sm:w-11 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-black text-xl flex items-center justify-center select-none transition active:scale-95 border-r border-slate-300 shrink-0"
               >
                 −
@@ -656,7 +703,11 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
               />
               <button
                 type="button"
-                onClick={() => setQuantity((prev) => (Number(prev) || 0) + 1)}
+                onClick={() => {
+                  const cur = parseQuantityNumber(quantity);
+                  const next = cur === 0.5 ? 1 : cur + 1;
+                  setQuantity(formatNumberVN(next));
+                }}
                 className="w-10 sm:w-11 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-black text-xl flex items-center justify-center select-none transition border-l border-slate-300 shrink-0 active:scale-95"
               >
                 +
@@ -774,30 +825,49 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
 
         {/* 5. TRẠNG THÁI THU TIỀN */}
         <div onClick={() => setCurrentStep(5)} className={`p-1.5 rounded-2xl border-[1.5px] transition-all duration-300 ${isStepGlowing(5) ? "step-glow-active ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/20" : "border-slate-200/60 bg-white"}`}>
-          {renderStepBadge(5, "đã/chưa thu")}
-        {/* 7. TRẠNG THÁI THU TIỀN: 2 NÚT NẰM TRÊN CÙNG 1 HÀNG */}
+          {renderStepBadge(5, "trạng thái thu tiền")}
+        {/* 7. TRẠNG THÁI THU TIỀN: 3 NÚT NẰM TRÊN CÙNG 1 HÀNG */}
         <div>
-          <div className="grid grid-cols-2 gap-2">
-            {/* Nút ĐÃ THU */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+            {/* Nút ĐÃ THU TIỀN MẶT */}
             <button
               type="button"
-              onClick={() => setPaymentStatus("paid")}
-              className={`h-10 sm:h-11 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 border-2 transition-all active:scale-[0.98] min-w-0 ${
-                paymentStatus === "paid"
+              onClick={() => {
+                setPaymentStatus("paid");
+                setPaymentMethod("cash");
+              }}
+              className={`h-10 sm:h-11 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1 border-2 transition-all active:scale-[0.98] min-w-0 ${
+                paymentStatus === "paid" && paymentMethod === "cash"
                   ? "bg-emerald-600 border-emerald-600 text-white shadow-2xs"
                   : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
               }`}
             >
               <span>✓</span>
-              <span className="truncate">Đã thu</span>
-              {paymentStatus === "paid" && <CheckCircle2 className="w-4 h-4 text-white shrink-0" />}
+              <span className="truncate">Đã thu TM</span>
+            </button>
+
+            {/* Nút ĐÃ THU CHUYỂN KHOẢN */}
+            <button
+              type="button"
+              onClick={() => {
+                setPaymentStatus("paid");
+                setPaymentMethod("transfer");
+              }}
+              className={`h-10 sm:h-11 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1 border-2 transition-all active:scale-[0.98] min-w-0 ${
+                paymentStatus === "paid" && paymentMethod === "transfer"
+                  ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
+                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+              }`}
+            >
+              <span>💳</span>
+              <span className="truncate">Đã thu CK</span>
             </button>
 
             {/* Nút CHƯA THU */}
             <button
               type="button"
               onClick={() => setPaymentStatus("unpaid")}
-              className={`h-10 sm:h-11 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 border-2 transition-all active:scale-[0.98] min-w-0 ${
+              className={`h-10 sm:h-11 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1 border-2 transition-all active:scale-[0.98] min-w-0 ${
                 paymentStatus === "unpaid"
                   ? "bg-red-600 border-red-600 text-white shadow-2xs"
                   : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
@@ -805,7 +875,6 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
             >
               <span>✗</span>
               <span className="truncate">Chưa thu</span>
-              {paymentStatus === "unpaid" && <CheckCircle2 className="w-4 h-4 text-white shrink-0" />}
             </button>
           </div>
         </div>
@@ -830,7 +899,7 @@ export default function SalesForm({ onAddRecord, loading = false, seller }: Sale
                     )}
                   </span>
                   <span className="text-slate-600 shrink-0 font-medium text-right">
-                    {it.quantity} bao × {it.bagType === "25kg" ? 25 : 50}kg × {formatNumberVN(it.unitPrice)} đ/kg = <strong className="text-emerald-700">{formatCurrencyVND(it.totalPrice)}</strong>
+                    {formatNumberVN(it.quantity)} bao × {it.bagType === "25kg" ? 25 : 50}kg × {formatNumberVN(it.unitPrice)} đ/kg = <strong className="text-emerald-700">{formatCurrencyVND(it.totalPrice)}</strong>
                   </span>
                 </div>
               ))
