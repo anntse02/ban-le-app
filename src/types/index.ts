@@ -2,6 +2,7 @@ export type PaymentMethod = "cash" | "transfer";
 export type PaymentStatus = "paid" | "unpaid";
 export type Seller = "Hằng" | "Gấm" | "Duyên" | string;
 export type BagType = "25kg" | "50kg" | "Khác" | string;
+export type FilterTab = "all" | "Hằng" | "Gấm" | "Duyên" | "paid" | "transfer" | "unpaid" | "partial";
 
 export interface ProductItem {
   id: string;

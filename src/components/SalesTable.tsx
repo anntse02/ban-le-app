@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useToast } from "@/components/Toast";
-import { SaleRecord, StockInRecord, PaymentMethod } from "@/types";
+import { SaleRecord, StockInRecord, PaymentMethod, FilterTab } from "@/types";
 import { formatVietnamDisplayDate, getVietnamDate } from "@/lib/dateUtils";
 import { formatCurrencyVND, formatNumberVN } from "@/lib/formatters";
 import {
@@ -20,6 +20,7 @@ import {
   Layers,
   AlertTriangle,
   ArrowDownToLine,
+  User,
 } from "lucide-react";
 
 interface SalesTableProps {
@@ -30,6 +31,8 @@ interface SalesTableProps {
   onDeleteRecord: (id: string, reason: string) => Promise<void>;
   selectedDate: string;
   onDateChange: (date: string) => void;
+  sellerFilter?: FilterTab;
+  onSellerFilterChange?: (filter: FilterTab) => void;
 }
 
 interface ItemSummary {
@@ -41,8 +44,6 @@ interface ItemSummary {
   totalRevenue: number;
 }
 
-type FilterTab = "all" | "Hằng" | "Gấm" | "Duyên" | "paid" | "transfer" | "unpaid" | "partial";
-
 export default function SalesTable({
   records,
   unpaidRecords = [],
@@ -51,10 +52,25 @@ export default function SalesTable({
   onDeleteRecord,
   selectedDate,
   onDateChange,
+  sellerFilter,
+  onSellerFilterChange,
 }: SalesTableProps) {
   const toast = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [activeFilter, setActiveFilter] = useState<FilterTab>(sellerFilter || "all");
+
+  useEffect(() => {
+    if (sellerFilter !== undefined) {
+      setActiveFilter(sellerFilter);
+    }
+  }, [sellerFilter]);
+
+  const handleFilterChange = (tab: FilterTab) => {
+    setActiveFilter(tab);
+    if (onSellerFilterChange) {
+      onSellerFilterChange(tab);
+    }
+  };
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState<boolean>(true);
 
@@ -114,12 +130,27 @@ export default function SalesTable({
       return timeB - timeA;
     });
 
-  // Tính tổng số liệu hợp lệ của ngày đang xem (CHỈ CỘNG TIỀN ĐÃ THU, KHÔNG CỘNG ĐƠN CHƯA THU)
+  const isSellerFilter = activeFilter === "Hằng" || activeFilter === "Gấm" || activeFilter === "Duyên";
+
+  // Lọc theo người bán nếu đang chọn hồ sơ người bán cụ thể
   const activeRecords = records.filter((r) => !r.isDeleted);
-  const totalRevenueDay = activeRecords
-    .filter((r) => r.paymentStatus !== "unpaid")
-    .reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
-  const totalBagsDay = activeRecords.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  const scopedActiveRecords = useMemo(() => {
+    if (isSellerFilter) {
+      return activeRecords.filter((r) => r.seller?.trim() === activeFilter);
+    }
+    return activeRecords;
+  }, [activeRecords, isSellerFilter, activeFilter]);
+
+  // Tính tổng số liệu hợp lệ của ngày đang xem (CHỈ CỘNG TIỀN ĐÃ THU, KHÔNG CỘNG ĐƠN CHƯA THU)
+  const totalRevenueDay = useMemo(() => {
+    return scopedActiveRecords
+      .filter((r) => r.paymentStatus !== "unpaid")
+      .reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
+  }, [scopedActiveRecords]);
+
+  const totalBagsDay = useMemo(() => {
+    return scopedActiveRecords.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  }, [scopedActiveRecords]);
 
   // Lọc danh sách đợt nhập kho trong ngày đang xem
   const dayStockInRecords = useMemo(() => {
@@ -132,7 +163,10 @@ export default function SalesTable({
 
   // Danh sách các đơn chưa thu tiền (luôn hiển thị trong Bảng Đơn Chưa Thu)
   const filteredUnpaidRecords = useMemo(() => {
-    const list = (unpaidRecords || []).filter((r) => !r.isDeleted);
+    let list = (unpaidRecords || []).filter((r) => !r.isDeleted);
+    if (isSellerFilter) {
+      list = list.filter((r) => r.seller?.trim() === activeFilter);
+    }
     if (!searchTerm.trim()) return list;
 
     const term = searchTerm.toLowerCase();
@@ -143,15 +177,15 @@ export default function SalesTable({
       (rec.bagType && rec.bagType.toLowerCase().includes(term)) ||
       (rec.note && rec.note.toLowerCase().includes(term))
     );
-  }, [unpaidRecords, searchTerm]);
+  }, [unpaidRecords, isSellerFilter, activeFilter, searchTerm]);
 
   const totalUnpaidAmount = useMemo(() => {
     return filteredUnpaidRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
   }, [filteredUnpaidRecords]);
 
-  // Bảng tổng hợp theo từng loại hàng
+  // Bảng tổng hợp theo từng loại hàng (lọc theo người bán nếu đang chọn hồ sơ người bán)
   const itemSummaryMap = new Map<string, ItemSummary>();
-  activeRecords.forEach((rec) => {
+  scopedActiveRecords.forEach((rec) => {
     const name = rec.itemName.trim() || "Chưa đặt tên";
     const qty = Number(rec.quantity) || 0;
     const total = Number(rec.totalPrice) || 0;
@@ -304,11 +338,15 @@ export default function SalesTable({
         {/* Tóm tắt nhanh số liệu của ngày đang xem */}
         <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
           <div>
-            <span className="text-slate-500">Doanh thu ngày: </span>
+            <span className="text-slate-500">
+              {isSellerFilter ? `Doanh thu ${activeFilter}: ` : "Doanh thu ngày: "}
+            </span>
             <span className="font-bold text-green-700">{formatCurrencyVND(totalRevenueDay)}</span>
           </div>
           <div>
-            <span className="text-slate-500">Tổng xuất: </span>
+            <span className="text-slate-500">
+              {isSellerFilter ? `Xuất của ${activeFilter}: ` : "Tổng xuất: "}
+            </span>
             <span className="font-bold text-slate-800">{formatNumberVN(totalBagsDay)} bao</span>
           </div>
         </div>
@@ -331,7 +369,7 @@ export default function SalesTable({
             {/* Nút Tất cả */}
             <button
               type="button"
-              onClick={() => setActiveFilter("all")}
+              onClick={() => handleFilterChange("all")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
                 activeFilter === "all"
                   ? "bg-slate-800 text-white shadow-2xs"
@@ -344,7 +382,7 @@ export default function SalesTable({
             {/* Nút Hằng */}
             <button
               type="button"
-              onClick={() => setActiveFilter("Hằng")}
+              onClick={() => handleFilterChange("Hằng")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
                 activeFilter === "Hằng"
                   ? "bg-pink-600 text-white shadow-2xs"
@@ -357,7 +395,7 @@ export default function SalesTable({
             {/* Nút Gấm */}
             <button
               type="button"
-              onClick={() => setActiveFilter("Gấm")}
+              onClick={() => handleFilterChange("Gấm")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
                 activeFilter === "Gấm"
                   ? "bg-purple-600 text-white shadow-2xs"
@@ -370,7 +408,7 @@ export default function SalesTable({
             {/* Nút Duyên */}
             <button
               type="button"
-              onClick={() => setActiveFilter("Duyên")}
+              onClick={() => handleFilterChange("Duyên")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
                 activeFilter === "Duyên"
                   ? "bg-amber-600 text-white shadow-2xs"
@@ -383,7 +421,7 @@ export default function SalesTable({
             {/* Nút ĐÃ THU */}
             <button
               type="button"
-              onClick={() => setActiveFilter("paid")}
+              onClick={() => handleFilterChange("paid")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1 ${
                 activeFilter === "paid"
                   ? "bg-emerald-600 text-white shadow-2xs"
@@ -397,7 +435,7 @@ export default function SalesTable({
             {/* Nút ĐÃ THU CHUYỂN KHOẢN */}
             <button
               type="button"
-              onClick={() => setActiveFilter("transfer")}
+              onClick={() => handleFilterChange("transfer")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1 ${
                 activeFilter === "transfer"
                   ? "bg-blue-600 text-white shadow-2xs"
@@ -411,7 +449,13 @@ export default function SalesTable({
             {/* Nút CHƯA THU */}
             <button
               type="button"
-              onClick={() => setActiveFilter("unpaid")}
+              onClick={() => {
+                handleFilterChange("unpaid");
+                const unpaidSection = document.getElementById("unpaid-orders-section");
+                if (unpaidSection) {
+                  unpaidSection.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1 ${
                 activeFilter === "unpaid"
                   ? "bg-red-600 text-white shadow-2xs"
@@ -425,7 +469,7 @@ export default function SalesTable({
             {/* Nút LẤY NHIỀU LẦN */}
             <button
               type="button"
-              onClick={() => setActiveFilter("partial")}
+              onClick={() => handleFilterChange("partial")}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition flex items-center gap-1 shrink-0 ${
                 activeFilter === "partial"
                   ? "bg-amber-600 text-white shadow-2xs"
@@ -449,7 +493,7 @@ export default function SalesTable({
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-emerald-200" />
               <h3 className="text-xs sm:text-sm font-black tracking-tight">
-                Tổng Lượng Từng Loại Hàng ({itemSummaries.length} loại)
+                {isSellerFilter ? `Tổng Lượng Của ${activeFilter}` : "Tổng Lượng Từng Loại Hàng"} ({itemSummaries.length} loại)
               </h3>
             </div>
             <span className="text-[11px] font-bold text-emerald-200 bg-white/10 px-2 py-0.5 rounded-md">
@@ -605,14 +649,14 @@ export default function SalesTable({
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
             <Package className="w-3.5 h-3.5 text-green-600" />
-            Chi Tiết Từng Đơn Bán ({filteredRecords.length} đơn đã thu):
+            Chi Tiết Từng Đơn Bán {isSellerFilter ? `Của ${activeFilter}` : ""} ({filteredRecords.length} đơn đã thu):
           </span>
         </div>
 
         {filteredRecords.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-xs">
             <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            Ngày {formatVietnamDisplayDate(selectedDate)} chưa có đơn bán nào đã thu tiền.
+            Ngày {formatVietnamDisplayDate(selectedDate)} chưa có đơn bán nào {isSellerFilter ? `của ${activeFilter}` : ""} đã thu tiền.
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -683,17 +727,32 @@ export default function SalesTable({
 
                       <div className="flex items-center gap-2">
                         {rec.seller === "Hằng" ? (
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-pink-100 text-pink-700 border border-pink-200">
+                          <button
+                            type="button"
+                            onClick={() => handleFilterChange("Hằng")}
+                            className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-200 transition active:scale-95"
+                            title="Bấm để lọc đúng hồ sơ của Hằng"
+                          >
                             Hằng
-                          </span>
+                          </button>
                         ) : rec.seller === "Gấm" ? (
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                          <button
+                            type="button"
+                            onClick={() => handleFilterChange("Gấm")}
+                            className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200 transition active:scale-95"
+                            title="Bấm để lọc đúng hồ sơ của Gấm"
+                          >
                             Gấm
-                          </span>
+                          </button>
                         ) : rec.seller === "Duyên" ? (
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          <button
+                            type="button"
+                            onClick={() => handleFilterChange("Duyên")}
+                            className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200 transition active:scale-95"
+                            title="Bấm để lọc đúng hồ sơ của Duyên"
+                          >
                             Duyên
-                          </span>
+                          </button>
                         ) : (
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                             {rec.seller || "—"}
@@ -828,7 +887,7 @@ export default function SalesTable({
               !
             </div>
             <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-tight">
-              Bảng Đơn Chưa Thu ({filteredUnpaidRecords.length} đơn):
+              Bảng Đơn Chưa Thu {isSellerFilter ? `Của ${activeFilter}` : ""} ({filteredUnpaidRecords.length} đơn):
             </h3>
           </div>
 
@@ -841,9 +900,9 @@ export default function SalesTable({
 
         {filteredUnpaidRecords.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-400 text-xs">
-            <p className="font-bold text-slate-700">Không có đơn chưa thu nào</p>
+            <p className="font-bold text-slate-700">Không có đơn chưa thu nào {isSellerFilter ? `của ${activeFilter}` : ""}</p>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              Tất cả các đơn bán đều đã được thanh toán đầy đủ.
+              {isSellerFilter ? `Tất cả các đơn bán của ${activeFilter} đều đã được thu tiền đầy đủ.` : "Tất cả các đơn bán đều đã được thanh toán đầy đủ."}
             </p>
           </div>
         ) : (

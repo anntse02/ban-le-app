@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { SaleRecord, PickupEvent, ProductItem, StockInRecord, PaymentMethod } from "@/types";
+import { SaleRecord, PickupEvent, ProductItem, StockInRecord, PaymentMethod, FilterTab } from "@/types";
 import SalesForm from "@/components/SalesForm";
 import SalesTable from "@/components/SalesTable";
 import PartialPickupsTab from "@/components/PartialPickupsTab";
@@ -37,6 +37,8 @@ import {
   ChevronDown,
   User,
   CheckCircle2,
+  BookOpen,
+  ArrowRight,
 } from "lucide-react";
 
 const INITIAL_PRODUCTS: ProductItem[] = [
@@ -59,18 +61,43 @@ export default function HomePage() {
   // Mã PIN bảo vệ (1977)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
 
-  // Trạng thái người bán và header
+  // Trạng thái người bán và hồ sơ
   const [sellerName, setSellerName] = useState<string>("Hằng");
+  const [tableSellerFilter, setTableSellerFilter] = useState<FilterTab>("all");
   const [isHeaderExpanded, setIsHeaderExpanded] = useState<boolean>(true);
-  const [isSellerDropdownOpen, setIsSellerDropdownOpen] = useState<boolean>(false);
+  const [isSellerModalOpen, setIsSellerModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     try {
       if (localStorage.getItem("ban_le_auth_unlocked") === "true") {
         setIsUnlocked(true);
       }
+      const savedSeller = localStorage.getItem("ban_le_seller_name");
+      if (savedSeller && ["Hằng", "Gấm", "Duyên"].includes(savedSeller)) {
+        setSellerName(savedSeller);
+        setTableSellerFilter(savedSeller as FilterTab);
+      }
     } catch (e) {}
   }, []);
+
+  const handleSelectSeller = (name: string, targetTab?: "form" | "table") => {
+    setSellerName(name);
+    setTableSellerFilter(name as FilterTab);
+    try {
+      localStorage.setItem("ban_le_seller_name", name);
+    } catch (e) {}
+
+    if (targetTab) {
+      setActiveTab(targetTab);
+    }
+    setIsSellerModalOpen(false);
+  };
+
+  const handleViewAllInTable = () => {
+    setTableSellerFilter("all");
+    setActiveTab("table");
+    setIsSellerModalOpen(false);
+  };
 
   const handleLockApp = () => {
     try {
@@ -1029,6 +1056,55 @@ export default function HomePage() {
     .filter((r) => r.bagType === "50kg")
     .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 
+  // Thống kê theo từng người bán cho Hồ Sơ Người Bán
+  const getSellerTodayStats = useCallback(
+    (name: string) => {
+      const list = todayActiveRecords.filter(
+        (r) => r.seller === name && r.paymentStatus !== "unpaid"
+      );
+      const rev = list.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
+      const bao25 = list
+        .filter((r) => r.bagType === "25kg")
+        .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+      const bao50 = list
+        .filter((r) => r.bagType === "50kg")
+        .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+      const sellerUnpaid = unpaidRecords.filter(
+        (r) => r.seller === name && !r.isDeleted
+      );
+      return {
+        orderCount: list.length,
+        revenue: rev,
+        bao25,
+        bao50,
+        totalBags: bao25 + bao50,
+        unpaidCount: sellerUnpaid.length,
+      };
+    },
+    [todayActiveRecords, unpaidRecords]
+  );
+
+  const isSellerScoped =
+    tableSellerFilter === "Hằng" ||
+    tableSellerFilter === "Gấm" ||
+    tableSellerFilter === "Duyên";
+  const displayRecords = isSellerScoped
+    ? todayActiveRecords.filter((r) => r.seller === tableSellerFilter)
+    : todayActiveRecords;
+  const displayRevenue = displayRecords.reduce(
+    (sum, r) => sum + (Number(r.totalPrice) || 0),
+    0
+  );
+  const displayBao25 = displayRecords
+    .filter((r) => r.bagType === "25kg")
+    .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  const displayBao50 = displayRecords
+    .filter((r) => r.bagType === "50kg")
+    .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  const displayUnpaidCount = isSellerScoped
+    ? unpaidRecords.filter((r) => r.seller === tableSellerFilter && !r.isDeleted).length
+    : unpaidRecords.length;
+
   // Đếm số đơn đang gửi kho
   const pendingPickupsCount = partialRecords.filter(
     (r) => r.isPartialPickup && r.pickupStatus !== "completed" && !r.isDeleted
@@ -1137,43 +1213,21 @@ export default function HomePage() {
           )}
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Nút Mở Hồ Sơ Người Bán */}
+            <button
+              type="button"
+              onClick={() => setIsSellerModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-pink-50 hover:bg-pink-100 active:scale-95 text-pink-700 text-[10px] sm:text-[11px] font-bold rounded-xl border border-pink-200 transition shadow-2xs"
+              title="Xem và quản lý hồ sơ người bán"
+            >
+              <div className="w-4 h-4 rounded-full bg-pink-200 text-pink-800 flex items-center justify-center text-[9px] font-black shrink-0">
+                {sellerName.charAt(0)}
+              </div>
+              <span>{sellerName}</span>
+            </button>
+
             {isHeaderExpanded && (
               <>
-                {/* Chọn Người Bán */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsSellerDropdownOpen(!isSellerDropdownOpen)}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-pink-50 hover:bg-pink-100 active:scale-95 text-pink-700 text-[10px] sm:text-[11px] font-bold rounded-xl border border-pink-200 transition"
-                  >
-                    <User className="w-3.5 h-3.5" />
-                    <span>{sellerName}</span>
-                    <ChevronDown className="w-3 h-3 opacity-70" />
-                  </button>
-                  
-                  {isSellerDropdownOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsSellerDropdownOpen(false)}></div>
-                      <div className="absolute right-0 top-full mt-1.5 w-32 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 overflow-hidden">
-                        {["Hằng", "Gấm", "Duyên"].map((name) => (
-                          <button
-                            key={name}
-                            type="button"
-                            onClick={() => {
-                              setSellerName(name);
-                              setIsSellerDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 text-[11px] font-bold flex items-center justify-between hover:bg-slate-50 transition ${sellerName === name ? 'text-pink-600 bg-pink-50/50' : 'text-slate-600'}`}
-                          >
-                            {name}
-                            {sellerName === name && <CheckCircle2 className="w-3 h-3 text-pink-600" />}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
                 <button
                   type="button"
                   onClick={() => setIsExportModalOpen(true)}
@@ -1267,27 +1321,37 @@ export default function HomePage() {
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="text-[10px] text-emerald-200 font-medium">
-                      Hôm nay ({todayActiveRecords.length} đơn đã thu):
+                      Hôm nay {isSellerScoped ? `(Của ${tableSellerFilter} - ${displayRecords.length} đơn):` : `(${todayActiveRecords.length} đơn đã thu):`}
                     </p>
-                    {unpaidRecords.length > 0 && (
+                    {displayUnpaidCount > 0 && (
                       <span className="text-[9px] bg-red-500/30 text-red-200 border border-red-300/40 px-1.5 py-0.2 rounded-full font-bold">
-                        {unpaidRecords.length} đơn chưa thu
+                        {displayUnpaidCount} đơn chưa thu
                       </span>
                     )}
+                    {isSellerScoped && (
+                      <button
+                        type="button"
+                        onClick={() => setTableSellerFilter("all")}
+                        className="text-[9px] bg-white/20 hover:bg-white/30 text-white px-2 py-0.5 rounded-full font-semibold transition cursor-pointer"
+                        title="Xem toàn bộ sổ bán hàng"
+                      >
+                        Xem tất cả
+                      </button>
+                    )}
                   </div>
-                  <p className="text-sm sm:text-base font-black">{formatVND(todayRevenue)}</p>
+                  <p className="text-sm sm:text-base font-black">{formatVND(displayRevenue)}</p>
                 </div>
               </div>
 
               <div className="text-right text-xs space-y-0.5">
                 <div className="bg-white/10 px-2 py-0.5 rounded-md inline-block">
                   <span className="text-emerald-200 text-[10px]">Bao 25kg: </span>
-                  <span className="font-bold text-white text-xs">{todayBao25} bao</span>
+                  <span className="font-bold text-white text-xs">{displayBao25} bao</span>
                 </div>
                 <br />
                 <div className="bg-white/10 px-2 py-0.5 rounded-md inline-block">
                   <span className="text-teal-200 text-[10px]">Bao 50kg: </span>
-                  <span className="font-bold text-white text-xs">{todayBao50} bao</span>
+                  <span className="font-bold text-white text-xs">{displayBao50} bao</span>
                 </div>
               </div>
             </div>
@@ -1301,6 +1365,8 @@ export default function HomePage() {
               onDeleteRecord={handleDeleteRecord}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
+              sellerFilter={tableSellerFilter}
+              onSellerFilterChange={setTableSellerFilter}
             />
           </div>
         ) : (
@@ -1422,6 +1488,195 @@ export default function HomePage() {
                 onAddNewProduct={handleAddNewProduct}
                 loading={loading}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL HỒ SƠ NGƯỜI BÁN */}
+      {isSellerModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
+            {/* Header Modal */}
+            <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-700 px-4 py-3.5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-white shadow-xs">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight">HỒ SƠ NGƯỜI BÁN</h3>
+                  <p className="text-[10px] text-pink-100">Chọn người bán & xem sổ đơn cá nhân</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSellerModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition active:scale-95 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Nội dung Modal */}
+            <div className="p-4 space-y-4 max-h-[82vh] overflow-y-auto">
+              {/* Thẻ Hồ Sơ Người Bán Đang Chọn */}
+              {(() => {
+                const currentStats = getSellerTodayStats(sellerName);
+                return (
+                  <div className="bg-gradient-to-br from-pink-50 via-rose-50 to-amber-50/50 rounded-2xl p-3.5 border-2 border-pink-200 shadow-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-11 h-11 rounded-2xl bg-pink-600 text-white font-black text-lg flex items-center justify-center shadow-xs">
+                          {sellerName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base font-black text-slate-800">{sellerName}</span>
+                            <span className="bg-pink-100 text-pink-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-pink-200">
+                              Đang đăng nhập
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500">Mặc định gán cho các đơn tạo mới</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Thống kê doanh số hôm nay của người này */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-pink-200/70">
+                      <div className="bg-white/90 rounded-xl p-2 text-center shadow-2xs border border-pink-100">
+                        <div className="text-[9px] text-slate-400 font-semibold">Doanh thu</div>
+                        <div className="text-[11px] sm:text-xs font-black text-emerald-700 truncate">
+                          {formatVND(currentStats.revenue)}
+                        </div>
+                      </div>
+
+                      <div className="bg-white/90 rounded-xl p-2 text-center shadow-2xs border border-pink-100">
+                        <div className="text-[9px] text-slate-400 font-semibold">Đã xuất</div>
+                        <div className="text-[11px] sm:text-xs font-black text-teal-700">
+                          {currentStats.totalBags} bao
+                        </div>
+                      </div>
+
+                      <div className="bg-white/90 rounded-xl p-2 text-center shadow-2xs border border-pink-100">
+                        <div className="text-[9px] text-slate-400 font-semibold">Chưa thu</div>
+                        <div className={`text-[11px] sm:text-xs font-black ${currentStats.unpaidCount > 0 ? "text-red-600" : "text-slate-400"}`}>
+                          {currentStats.unpaidCount} đơn
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Nút hành động trực tiếp */}
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSeller(sellerName, "table")}
+                        className="flex items-center justify-center gap-1.5 py-2 px-3 bg-pink-600 hover:bg-pink-700 active:scale-95 text-white text-[11px] font-bold rounded-xl shadow-xs transition cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Xem Sổ của {sellerName}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSeller(sellerName, "form")}
+                        className="flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-bold rounded-xl shadow-xs transition cursor-pointer"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Tạo Đơn ({sellerName})</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Danh sách người bán để chuyển đổi */}
+              <div>
+                <p className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Chuyển Đổi Hồ Sơ Người Bán:</span>
+                </p>
+
+                <div className="space-y-2">
+                  {(["Hằng", "Gấm", "Duyên"] as const).map((name) => {
+                    const isSelected = sellerName === name;
+                    const stats = getSellerTodayStats(name);
+
+                    return (
+                      <div
+                        key={name}
+                        className={`rounded-2xl p-2.5 border transition-all flex items-center justify-between gap-2 ${
+                          isSelected
+                            ? "bg-pink-50/60 border-pink-300 ring-1 ring-pink-200"
+                            : "bg-slate-50 hover:bg-slate-100/80 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? "bg-pink-600 text-white shadow-2xs"
+                                : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-800">{name}</span>
+                              {isSelected && (
+                                <span className="text-[8px] bg-pink-100 text-pink-700 font-bold px-1.5 py-0.2 rounded-full">
+                                  Hiện tại
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[9px] text-slate-400 truncate">
+                              Hôm nay: {formatVND(stats.revenue)} • {stats.totalBags} bao
+                              {stats.unpaidCount > 0 && (
+                                <span className="text-red-500 font-semibold ml-1">
+                                  ({stats.unpaidCount} đơn chưa thu)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!isSelected && (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectSeller(name)}
+                              className="px-2.5 py-1.5 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 border border-slate-200 text-[10px] font-bold rounded-lg shadow-2xs transition cursor-pointer"
+                            >
+                              Chọn
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSeller(name, "table")}
+                            className="px-2.5 py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-700 active:scale-95 border border-pink-200 text-[10px] font-bold rounded-lg transition flex items-center gap-1 cursor-pointer"
+                            title={`Xem sổ đơn của ${name}`}
+                          >
+                            <span>Vào Sổ</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Nút Xem Toàn Bộ Sổ Đơn Hàng (Bỏ lọc người bán) */}
+              <div className="pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleViewAllInTable}
+                  className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <ClipboardList className="w-4 h-4 text-slate-500" />
+                  <span>Xem Sổ Đơn Toàn Cửa Hàng (Tất Cả Người Bán)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
