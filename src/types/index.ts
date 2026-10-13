@@ -70,6 +70,13 @@ export interface SaleRecord {
   deleteReason?: string;     // Lý do xóa
   deletedAt?: number;        // Timestamp thời điểm xóa
 
+  // Thời gian tạo & đã thu tiền cho Đơn chưa thu
+  createdDate?: string;      // Ngày tạo đơn ban đầu (YYYY-MM-DD)
+  createdTime?: string;      // Giờ tạo đơn ban đầu (HH:mm:ss)
+  paidAt?: number;           // Timestamp thời điểm thu tiền
+  paidDate?: string;         // Ngày thu tiền (YYYY-MM-DD)
+  paidTime?: string;         // Giờ thu tiền (HH:mm:ss)
+
   // Tính năng Khách mua 1 đơn lấy hàng nhiều lần (Đơn gửi kho)
   isPartialPickup?: boolean; // true nếu là đơn lấy nhiều lần
   pickupStatus?: "pending" | "completed"; // "pending": Chưa lấy hết | "completed": Đã lấy đủ

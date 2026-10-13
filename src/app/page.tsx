@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { SaleRecord, PickupEvent, ProductItem, StockInRecord } from "@/types";
+import { SaleRecord, PickupEvent, ProductItem, StockInRecord, PaymentMethod } from "@/types";
 import SalesForm from "@/components/SalesForm";
 import SalesTable from "@/components/SalesTable";
 import PartialPickupsTab from "@/components/PartialPickupsTab";
@@ -95,13 +95,16 @@ export default function HomePage() {
   const [dateRecordsMap, setDateRecordsMap] = useState<Record<string, SaleRecord[]>>({});
   // Danh sách các đơn lấy nhiều lần (đang lưu giữ / gửi kho)
   const [partialRecords, setPartialRecords] = useState<SaleRecord[]>([]);
+  // Danh sách tất cả các đơn chưa thu tiền (luôn hiển thị trong Bảng Đơn Chưa Thu)
+  const [unpaidRecords, setUnpaidRecords] = useState<SaleRecord[]>([]);
   // Danh sách các ngày đã tải từ Firestore để tránh đọc lại
   const [loadedDates, setLoadedDates] = useState<Set<string>>(new Set());
 
-  // 1. LẮNG NGHE ĐƠN HÀNG HÔM NAY, ĐƠN GỬI KHO, DANH MỤC HÀNG & PHIẾU NHẬP KHO
+  // 1. LẮNG NGHE ĐƠN HÀNG HÔM NAY, ĐƠN GỬI KHO, ĐƠN CHƯA THU, DANH MỤC HÀNG & PHIẾU NHẬP KHO
   useEffect(() => {
     let unsubscribeToday = () => {};
     let unsubscribePartials = () => {};
+    let unsubscribeUnpaid = () => {};
     let unsubscribeProducts = () => {};
     let unsubscribeStockIn = () => {};
 
@@ -205,6 +208,32 @@ export default function HomePage() {
             console.warn("Firestore stock_in listener error:", err);
           }
         );
+
+        // E. Lắng nghe tất cả các đơn chưa thu tiền (luôn cập nhật vào Bảng Đơn Chưa Thu)
+        const unpaidQuery = query(
+          collection(db, "sales"),
+          where("paymentStatus", "==", "unpaid")
+        );
+        unsubscribeUnpaid = onSnapshot(
+          unpaidQuery,
+          (snapshot) => {
+            const uData: SaleRecord[] = [];
+            snapshot.forEach((docSnap) => {
+              const item = docSnap.data() as Omit<SaleRecord, "id">;
+              if (!item.isDeleted) {
+                uData.push({
+                  id: docSnap.id,
+                  ...item,
+                });
+              }
+            });
+            uData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            setUnpaidRecords(uData);
+          },
+          (err) => {
+            console.warn("Firestore unpaid listener error:", err);
+          }
+        );
       } catch (e) {
         loadFromLocalStorage();
       }
@@ -215,6 +244,7 @@ export default function HomePage() {
     return () => {
       unsubscribeToday();
       unsubscribePartials();
+      unsubscribeUnpaid();
       unsubscribeProducts();
       unsubscribeStockIn();
     };
@@ -235,6 +265,7 @@ export default function HomePage() {
           });
           setDateRecordsMap(map);
           setPartialRecords(all.filter((r) => r.isPartialPickup));
+          setUnpaidRecords(all.filter((r) => r.paymentStatus === "unpaid" && !r.isDeleted));
         } catch (e) {
           console.error("Lỗi đọc localStorage sales:", e);
         }
@@ -543,6 +574,8 @@ export default function HomePage() {
       ...newRecord,
       id: "rec_" + Date.now(),
       createdAt: Date.now(),
+      createdDate: newRecord.createdDate || newRecord.date,
+      createdTime: newRecord.createdTime || newRecord.time,
     };
 
     try {
@@ -568,6 +601,10 @@ export default function HomePage() {
 
       if (newRecord.isPartialPickup) {
         setPartialRecords((prev) => [recordWithTime, ...prev.filter((r) => r.id !== recordWithTime.id)]);
+      }
+
+      if (newRecord.paymentStatus === "unpaid") {
+        setUnpaidRecords((prev) => [recordWithTime, ...prev.filter((r) => r.id !== recordWithTime.id)]);
       }
 
       saveToLocal(recordWithTime);
@@ -602,6 +639,9 @@ export default function HomePage() {
       if (newRecord.isPartialPickup) {
         setPartialRecords((prev) => [recordWithTime, ...prev.filter((r) => r.id !== recordWithTime.id)]);
       }
+      if (newRecord.paymentStatus === "unpaid") {
+        setUnpaidRecords((prev) => [recordWithTime, ...prev.filter((r) => r.id !== recordWithTime.id)]);
+      }
       saveToLocal(recordWithTime);
     } finally {
       setLoading(false);
@@ -618,6 +658,8 @@ export default function HomePage() {
       ...item,
       id: "rec_" + (now + idx),
       createdAt: now + idx,
+      createdDate: item.createdDate || item.date,
+      createdTime: item.createdTime || item.time,
     }));
 
     try {
@@ -647,6 +689,11 @@ export default function HomePage() {
       const partialsToAdd = createdRecords.filter((r) => r.isPartialPickup);
       if (partialsToAdd.length > 0) {
         setPartialRecords((prev) => [...partialsToAdd, ...prev]);
+      }
+
+      const unpaidsToAdd = createdRecords.filter((r) => r.paymentStatus === "unpaid");
+      if (unpaidsToAdd.length > 0) {
+        setUnpaidRecords((prev) => [...unpaidsToAdd, ...prev]);
       }
 
       // Lưu LocalStorage
@@ -779,7 +826,7 @@ export default function HomePage() {
   const handleDeleteRecord = async (id: string, reason: string) => {
     const targetDate = selectedDate;
     const currentList = dateRecordsMap[targetDate] || [];
-    const targetRecord = currentList.find((r) => r.id === id);
+    const targetRecord = currentList.find((r) => r.id === id) || unpaidRecords.find((r) => r.id === id);
 
     setDateRecordsMap((prev) => {
       const list = prev[targetDate] || [];
@@ -803,6 +850,8 @@ export default function HomePage() {
     setPartialRecords((prev) =>
       prev.map((r) => (r.id === id ? { ...r, isDeleted: true, deleteReason: reason, deletedAt: Date.now() } : r))
     );
+
+    setUnpaidRecords((prev) => prev.filter((r) => r.id !== id));
 
     // Hoàn trả lại số lượng tồn kho thực tế đã trừ khi xóa đơn bán
     if (targetRecord && !targetRecord.isDeleted) {
@@ -831,6 +880,73 @@ export default function HomePage() {
         }));
       } catch (err: any) {
         console.warn("Lỗi update Firebase:", err);
+      }
+    }
+  };
+
+  // 8b. XÁC NHẬN ĐÃ THU TIỀN CHO ĐƠN CHƯA THU (CHUYỂN SANG SỔ BÁN HÀNG & CỘNG TIỀN)
+  const handleMarkAsPaid = async (
+    recordId: string,
+    paymentMethod: PaymentMethod = "cash",
+    note?: string
+  ) => {
+    const paidDate = getVietnamDate();
+    const paidTime = getVietnamTime();
+    const paidAt = Date.now();
+
+    const target = unpaidRecords.find((r) => r.id === recordId) ||
+      Object.values(dateRecordsMap).flat().find((r) => r.id === recordId);
+
+    if (!target) return;
+
+    const origDate = target.date;
+    const updatedRecord: SaleRecord = {
+      ...target,
+      paymentStatus: "paid",
+      paymentMethod,
+      paidAt,
+      paidDate,
+      paidTime,
+      createdDate: target.createdDate || target.date,
+      createdTime: target.createdTime || target.time,
+      date: paidDate,
+      time: paidTime,
+      note: note ? (target.note ? `${target.note} (${note})` : note) : target.note,
+    };
+
+    // 1. Xóa khỏi danh sách đơn chưa thu
+    setUnpaidRecords((prev) => prev.filter((r) => r.id !== recordId));
+
+    // 2. Chuyển vào Sổ bán hàng của ngày thu tiền (Hôm nay) để cộng vào doanh thu hôm nay
+    setDateRecordsMap((prev) => {
+      const origList = (prev[origDate] || []).filter((r) => r.id !== recordId);
+      const paidList = origDate === paidDate ? origList : (prev[paidDate] || []);
+      return {
+        ...prev,
+        [origDate]: origList,
+        [paidDate]: [updatedRecord, ...paidList.filter((r) => r.id !== recordId)],
+      };
+    });
+
+    saveToLocal(updatedRecord);
+
+    // 3. Cập nhật Firestore
+    if (isFirebaseConfigured() && db) {
+      try {
+        await updateDoc(doc(db, "sales", recordId), sanitizeForFirestore({
+          paymentStatus: "paid",
+          paymentMethod,
+          paidAt,
+          paidDate,
+          paidTime,
+          createdDate: target.createdDate || target.date,
+          createdTime: target.createdTime || target.time,
+          date: paidDate,
+          time: paidTime,
+          ...(note ? { note: updatedRecord.note } : {}),
+        }));
+      } catch (err) {
+        console.warn("Lỗi cập nhật đã thu tiền Firestore:", err);
       }
     }
   };
@@ -894,14 +1010,18 @@ export default function HomePage() {
   );
 
   const isRecordInSalesBook = (r: SaleRecord) => {
+    // Đơn chưa thu sẽ không nằm ở Chi Tiết Từng Đơn Bán mà nằm ở Bảng Đơn Chưa Thu riêng
+    if (r.paymentStatus === "unpaid") return false;
     if (!r.isPartialPickup) return true;
     return r.pickupStatus === "completed";
   };
 
-  // Thống kê hôm nay
+  // Thống kê hôm nay: CHỈ CỘNG TIỀN ĐƠN ĐÃ THANH TOÁN (ĐÃ THU), KHÔNG CỘNG ĐƠN CHƯA THU!
   const todayRecords = (dateRecordsMap[today] || []).filter(isRecordInSalesBook);
   const todayActiveRecords = todayRecords.filter((r) => !r.isDeleted);
-  const todayRevenue = todayActiveRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
+  const todayRevenue = todayActiveRecords
+    .filter((r) => r.paymentStatus !== "unpaid")
+    .reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
   const todayBao25 = todayActiveRecords
     .filter((r) => r.bagType === "25kg")
     .reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
@@ -1145,9 +1265,16 @@ export default function HomePage() {
                   <Sparkles className="w-4 h-4 text-emerald-200" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-emerald-200 font-medium">
-                    Hôm nay ({todayActiveRecords.length} đơn):
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-[10px] text-emerald-200 font-medium">
+                      Hôm nay ({todayActiveRecords.length} đơn đã thu):
+                    </p>
+                    {unpaidRecords.length > 0 && (
+                      <span className="text-[9px] bg-red-500/30 text-red-200 border border-red-300/40 px-1.5 py-0.2 rounded-full font-bold">
+                        {unpaidRecords.length} đơn chưa thu
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm sm:text-base font-black">{formatVND(todayRevenue)}</p>
                 </div>
               </div>
@@ -1168,6 +1295,8 @@ export default function HomePage() {
             {/* Bảng sổ đơn hàng */}
             <SalesTable
               records={currentViewRecords}
+              unpaidRecords={unpaidRecords}
+              onMarkAsPaid={handleMarkAsPaid}
               stockInRecords={stockInRecords}
               onDeleteRecord={handleDeleteRecord}
               selectedDate={selectedDate}

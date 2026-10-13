@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useToast } from "@/components/Toast";
-import { SaleRecord, StockInRecord } from "@/types";
+import { SaleRecord, StockInRecord, PaymentMethod } from "@/types";
 import { formatVietnamDisplayDate, getVietnamDate } from "@/lib/dateUtils";
 import { formatCurrencyVND, formatNumberVN } from "@/lib/formatters";
 import {
@@ -24,6 +24,8 @@ import {
 
 interface SalesTableProps {
   records: SaleRecord[];
+  unpaidRecords?: SaleRecord[];
+  onMarkAsPaid?: (id: string, paymentMethod: PaymentMethod, note?: string) => Promise<void>;
   stockInRecords?: StockInRecord[];
   onDeleteRecord: (id: string, reason: string) => Promise<void>;
   selectedDate: string;
@@ -43,6 +45,8 @@ type FilterTab = "all" | "Hằng" | "Gấm" | "Duyên" | "paid" | "transfer" | "
 
 export default function SalesTable({
   records,
+  unpaidRecords = [],
+  onMarkAsPaid,
   stockInRecords = [],
   onDeleteRecord,
   selectedDate,
@@ -58,6 +62,12 @@ export default function SalesTable({
   const [deleteReason, setDeleteReason] = useState<string>("");
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
+  // State cho Modal xác nhận đã thu tiền
+  const [payingRecord, setPayingRecord] = useState<SaleRecord | null>(null);
+  const [payingMethod, setPayingMethod] = useState<PaymentMethod>("cash");
+  const [payingNote, setPayingNote] = useState<string>("");
+  const [isPaying, setIsPaying] = useState<boolean>(false);
+
   const [yearStr, monthStr] = (selectedDate || getVietnamDate()).split("-");
   const [calendarYear, setCalendarYear] = useState<number>(Number(yearStr) || new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState<number>(Number(monthStr) || new Date().getMonth() + 1);
@@ -65,23 +75,27 @@ export default function SalesTable({
   const todayStr = getVietnamDate();
 
   // Đếm theo người bán, trạng thái thu tiền và đơn lấy nhiều lần
-  const countHang = records.filter((r) => r.seller === "Hằng" && !r.isDeleted).length;
-  const countGam = records.filter((r) => r.seller === "Gấm" && !r.isDeleted).length;
-  const countDuyen = records.filter((r) => r.seller === "Duyên" && !r.isDeleted).length;
+  const countHang = records.filter((r) => r.seller === "Hằng" && !r.isDeleted && r.paymentStatus !== "unpaid").length;
+  const countGam = records.filter((r) => r.seller === "Gấm" && !r.isDeleted && r.paymentStatus !== "unpaid").length;
+  const countDuyen = records.filter((r) => r.seller === "Duyên" && !r.isDeleted && r.paymentStatus !== "unpaid").length;
   const countPaid = records.filter((r) => r.paymentStatus !== "unpaid" && !r.isDeleted).length;
   const countTransfer = records.filter((r) => r.paymentStatus !== "unpaid" && r.paymentMethod === "transfer" && !r.isDeleted).length;
-  const countUnpaid = records.filter((r) => r.paymentStatus === "unpaid" && !r.isDeleted).length;
+  // Đếm tổng số đơn chưa thu từ danh sách unpaidRecords toàn hệ thống
+  const countUnpaid = unpaidRecords.filter((r) => !r.isDeleted).length;
   const countPartial = records.filter((r) => r.isPartialPickup && !r.isDeleted).length;
 
-  // Lọc theo bộ lọc và từ khóa tìm kiếm
+  // Lọc theo bộ lọc và từ khóa tìm kiếm (Bảng Chi Tiết Từng Đơn Bán CHỈ HIỆN ĐƠN ĐÃ THU)
   const filteredRecords = records.filter((rec) => {
+    // Đơn chưa thu sẽ không nằm ở bảng Chi Tiết Từng Đơn Bán mà nằm ở Bảng Đơn Chưa Thu riêng
+    if (rec.paymentStatus === "unpaid") return false;
+
     let matchesFilter = true;
     if (activeFilter === "Hằng") matchesFilter = rec.seller === "Hằng";
     else if (activeFilter === "Gấm") matchesFilter = rec.seller === "Gấm";
     else if (activeFilter === "Duyên") matchesFilter = rec.seller === "Duyên";
-    else if (activeFilter === "paid") matchesFilter = rec.paymentStatus !== "unpaid";
-    else if (activeFilter === "transfer") matchesFilter = rec.paymentStatus !== "unpaid" && rec.paymentMethod === "transfer";
-    else if (activeFilter === "unpaid") matchesFilter = rec.paymentStatus === "unpaid";
+    else if (activeFilter === "paid") matchesFilter = true;
+    else if (activeFilter === "transfer") matchesFilter = rec.paymentMethod === "transfer";
+    else if (activeFilter === "unpaid") matchesFilter = false;
     else if (activeFilter === "partial") matchesFilter = !!rec.isPartialPickup;
 
     const matchesSearch =
@@ -100,9 +114,11 @@ export default function SalesTable({
       return timeB - timeA;
     });
 
-  // Tính tổng số liệu hợp lệ của ngày đang xem
+  // Tính tổng số liệu hợp lệ của ngày đang xem (CHỈ CỘNG TIỀN ĐÃ THU, KHÔNG CỘNG ĐƠN CHƯA THU)
   const activeRecords = records.filter((r) => !r.isDeleted);
-  const totalRevenueDay = activeRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
+  const totalRevenueDay = activeRecords
+    .filter((r) => r.paymentStatus !== "unpaid")
+    .reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
   const totalBagsDay = activeRecords.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 
   // Lọc danh sách đợt nhập kho trong ngày đang xem
@@ -113,6 +129,25 @@ export default function SalesTable({
   const totalDayImportBags = useMemo(() => {
     return dayStockInRecords.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
   }, [dayStockInRecords]);
+
+  // Danh sách các đơn chưa thu tiền (luôn hiển thị trong Bảng Đơn Chưa Thu)
+  const filteredUnpaidRecords = useMemo(() => {
+    const list = (unpaidRecords || []).filter((r) => !r.isDeleted);
+    if (!searchTerm.trim()) return list;
+
+    const term = searchTerm.toLowerCase();
+    return list.filter((rec) =>
+      rec.itemName.toLowerCase().includes(term) ||
+      (rec.customerName && rec.customerName.toLowerCase().includes(term)) ||
+      (rec.seller && rec.seller.toLowerCase().includes(term)) ||
+      (rec.bagType && rec.bagType.toLowerCase().includes(term)) ||
+      (rec.note && rec.note.toLowerCase().includes(term))
+    );
+  }, [unpaidRecords, searchTerm]);
+
+  const totalUnpaidAmount = useMemo(() => {
+    return filteredUnpaidRecords.reduce((sum, r) => sum + (Number(r.totalPrice) || 0), 0);
+  }, [filteredUnpaidRecords]);
 
   // Bảng tổng hợp theo từng loại hàng
   const itemSummaryMap = new Map<string, ItemSummary>();
@@ -135,7 +170,10 @@ export default function SalesTable({
 
     const existing = itemSummaryMap.get(name)!;
     existing.totalQuantity += qty;
-    existing.totalRevenue += total;
+    // CHỈ CỘNG TIỀN NẾU ĐƠN ĐÃ ĐƯỢC THU TIỀN!
+    if (rec.paymentStatus !== "unpaid") {
+      existing.totalRevenue += total;
+    }
     if (bag === "25kg") {
       existing.bag25 += qty;
     } else if (bag === "50kg") {
@@ -148,6 +186,29 @@ export default function SalesTable({
   const itemSummaries = Array.from(itemSummaryMap.values()).sort(
     (a, b) => b.totalQuantity - a.totalQuantity
   );
+
+  const handleOpenPayModal = (record: SaleRecord) => {
+    setPayingRecord(record);
+    setPayingMethod("cash");
+    setPayingNote("");
+  };
+
+  const handleConfirmPay = async () => {
+    if (!payingRecord || !payingRecord.id) return;
+    setIsPaying(true);
+    try {
+      if (onMarkAsPaid) {
+        await onMarkAsPaid(payingRecord.id, payingMethod, payingNote.trim());
+      }
+      toast.success("Đã thu tiền thành công! Đơn đã chuyển sang Chi Tiết Từng Đơn Bán.");
+      setPayingRecord(null);
+      setPayingNote("");
+    } catch (e: any) {
+      toast.error("Lỗi khi thu tiền: " + (e?.message || e));
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   const handleOpenDeleteModal = (record: SaleRecord) => {
     setDeletingRecord(record);
@@ -544,14 +605,14 @@ export default function SalesTable({
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
             <Package className="w-3.5 h-3.5 text-green-600" />
-            Chi Tiết Từng Đơn Bán ({filteredRecords.length} đơn):
+            Chi Tiết Từng Đơn Bán ({filteredRecords.length} đơn đã thu):
           </span>
         </div>
 
         {filteredRecords.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-xs">
             <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            Ngày {formatVietnamDisplayDate(selectedDate)} chưa có đơn bán nào.
+            Ngày {formatVietnamDisplayDate(selectedDate)} chưa có đơn bán nào đã thu tiền.
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -604,9 +665,9 @@ export default function SalesTable({
                         )}
 
                         {!isDel && (
-                          isUnpaid ? (
-                            <span className="ml-1 px-1.5 py-0.2 rounded font-black text-[10px] bg-red-100 text-red-700 border border-red-200">
-                              Chưa thu
+                          rec.paidDate ? (
+                            <span className="ml-1 px-1.5 py-0.2 rounded font-bold text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                              ✓ ĐÃ THU NỢ ({rec.paymentMethod === "transfer" ? "CK" : "TM"})
                             </span>
                           ) : rec.paymentMethod === "transfer" ? (
                             <span className="ml-1 px-1.5 py-0.2 rounded font-bold text-[10px] bg-blue-100 text-blue-800 border border-blue-200">
@@ -718,6 +779,15 @@ export default function SalesTable({
                           </div>
                         )}
 
+                        {rec.paidDate && (
+                          <div className="mt-1 p-1.5 bg-emerald-50/90 border border-emerald-200 rounded-lg text-[10px] text-emerald-900 flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-emerald-800">Thông tin thu nợ:</span>
+                            <span>Tạo đơn: <strong>{formatVietnamDisplayDate(rec.createdDate || rec.date)} {rec.createdTime || ""}</strong></span>
+                            <span>•</span>
+                            <span>Đã thu tiền: <strong>{formatVietnamDisplayDate(rec.paidDate)} {rec.paidTime || ""}</strong></span>
+                          </div>
+                        )}
+
                         {rec.note && (
                           <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 inline-block">
                             📝 {rec.note}
@@ -750,7 +820,147 @@ export default function SalesTable({
         )}
       </div>
 
-      {/* 4. CHI TIẾT NHẬP KHO TRONG NGÀY ĐANG XEM */}
+      {/* 4. BẢNG ĐƠN CHƯA THU (NẰM PHÍA DƯỚI CHI TIẾT TỪNG ĐƠN BÁN) */}
+      <div id="unpaid-orders-section" className="pt-2">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-md bg-red-600 text-white flex items-center justify-center font-black text-xs shadow-2xs">
+              !
+            </div>
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-tight">
+              Bảng Đơn Chưa Thu ({filteredUnpaidRecords.length} đơn):
+            </h3>
+          </div>
+
+          {totalUnpaidAmount > 0 && (
+            <span className="text-[11px] font-black text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg shadow-2xs">
+              Tổng chưa thu: {formatCurrencyVND(totalUnpaidAmount)}
+            </span>
+          )}
+        </div>
+
+        {filteredUnpaidRecords.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-400 text-xs">
+            <p className="font-bold text-slate-700">Không có đơn chưa thu nào</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Tất cả các đơn bán đều đã được thanh toán đầy đủ.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredUnpaidRecords.map((rec, uIdx) => {
+              return (
+                <div
+                  key={rec.id || uIdx}
+                  className="rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50/40 to-white p-3 shadow-xs hover:shadow-sm transition-all flex items-start gap-2.5"
+                >
+                  {/* SỐ THỨ TỰ BÊN TRÁI */}
+                  <div className="flex flex-col items-center gap-1 shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center bg-red-100 border border-red-300 text-red-700 shadow-2xs">
+                      {uIdx + 1}
+                    </div>
+                  </div>
+
+                  {/* NỘI DUNG ĐƠN CHƯA THU */}
+                  <div className="flex-1 min-w-0">
+                    {/* Hàng 1: Thời gian tạo đơn chưa thu & Thời gian đã thu */}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-red-100 text-xs gap-1 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* THỜI GIAN TẠO ĐƠN CHƯA THU */}
+                        <div className="flex items-center gap-1 text-[11px] text-slate-600 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200">
+                          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>Tạo đơn:</span>
+                          <strong className="font-bold text-slate-800">
+                            {formatVietnamDisplayDate(rec.createdDate || rec.date)} {rec.createdTime || rec.time || ""}
+                          </strong>
+                        </div>
+
+                        {/* THỜI GIAN ĐÃ THU */}
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-100/80 px-2 py-0.5 rounded-md border border-red-300">
+                          <span>Đã thu:</span>
+                          <span className="font-extrabold uppercase">Chưa thu (—)</span>
+                        </div>
+                      </div>
+
+                      {/* Người bán */}
+                      <div className="text-[11px] font-semibold text-slate-500">
+                        Người bán: <strong className="text-slate-800">{rec.seller || "—"}</strong>
+                      </div>
+                    </div>
+
+                    {/* Hàng 2: Chi tiết Tên, Loại, Tên khách, Số lượng x Đơn giá, Số tiền */}
+                    <div className="pt-2 flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        {/* Tên hàng + Loại bao */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-sm text-slate-900">{rec.itemName}</span>
+                          {rec.bagType && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                              <Scale className="w-3 h-3 text-amber-700" />
+                              Loại: {rec.bagType}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Tên khách */}
+                        <p className="text-xs text-blue-700 font-semibold flex items-center gap-1">
+                          <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Khách hàng: <strong className="font-black text-blue-900">{rec.customerName || "Khách lẻ"}</strong></span>
+                        </p>
+
+                        {/* Số lượng x Đơn giá */}
+                        <p className="text-xs text-slate-600">
+                          Số lượng: <strong className="font-black text-slate-900">{formatNumberVN(rec.quantity)} bao</strong> ×{" "}
+                          <span className="font-bold text-slate-700">{formatNumberVN(rec.unitPrice)} đ/bao</span>
+                        </p>
+
+                        {rec.note && (
+                          <p className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
+                            📝 {rec.note}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Số tiền */}
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Số tiền</span>
+                        <p className="text-base sm:text-lg font-black text-red-600">
+                          {formatCurrencyVND(rec.totalPrice)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Hàng 3: NÚT ĐÃ THU & NÚT HỦY ĐƠN */}
+                    <div className="mt-2.5 pt-2 border-t border-red-100 flex items-center justify-end gap-2">
+                      {/* NÚT HỦY ĐƠN */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDeleteModal(rec)}
+                        className="py-1.5 px-3 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-700 font-bold rounded-xl text-xs border border-slate-200 hover:border-red-300 transition flex items-center gap-1 active:scale-95"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        <span>Hủy đơn</span>
+                      </button>
+
+                      {/* NÚT ĐÃ THU */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPayModal(rec)}
+                        className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-xs shadow-xs transition flex items-center gap-1.5"
+                      >
+                        <span>✓</span>
+                        <span>ĐÃ THU</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 5. CHI TIẾT NHẬP KHO TRONG NGÀY ĐANG XEM */}
       <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200 shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -975,6 +1185,99 @@ export default function SalesTable({
                 className="py-2.5 px-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md transition disabled:opacity-50"
               >
                 {isDeleting ? "Đang xóa..." : "Xác nhận xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL XÁC NHẬN ĐÃ THU TIỀN */}
+      {payingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 p-5 space-y-3.5">
+            <div className="flex items-center gap-2 text-emerald-700 pb-2 border-b border-slate-100">
+              <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                ✓
+              </div>
+              <h3 className="font-black text-base text-slate-800">Xác Nhận Đã Thu Tiền</h3>
+            </div>
+
+            <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-200 text-xs space-y-1">
+              <p><strong>Khách hàng:</strong> <span className="text-blue-800 font-bold">{payingRecord.customerName || "Khách lẻ"}</span></p>
+              <p><strong>Mặt hàng:</strong> {payingRecord.itemName} ({payingRecord.bagType})</p>
+              <p><strong>Số lượng:</strong> {formatNumberVN(payingRecord.quantity)} bao</p>
+              <p className="pt-1 text-sm border-t border-emerald-200">
+                <strong>Số tiền thu:</strong> <span className="text-base font-black text-green-700">{formatCurrencyVND(payingRecord.totalPrice)}</span>
+              </p>
+            </div>
+
+            {/* Chọn hình thức thu */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Hình thức thanh toán:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPayingMethod("cash")}
+                  className={`py-2 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 transition ${
+                    payingMethod === "cash"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>💵</span>
+                  <span>Tiền mặt</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPayingMethod("transfer")}
+                  className={`py-2 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 transition ${
+                    payingMethod === "transfer"
+                      ? "border-blue-600 bg-blue-50 text-blue-800"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>💳</span>
+                  <span>Chuyển khoản</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Ghi chú thêm */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Ghi chú thu tiền (nếu có):
+              </label>
+              <input
+                type="text"
+                placeholder="VD: Khách trả đủ tiền mặt..."
+                value={payingNote}
+                onChange={(e) => setPayingNote(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPayingRecord(null);
+                  setPayingNote("");
+                }}
+                className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+              >
+                Hủy bỏ
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmPay}
+                disabled={isPaying}
+                className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-md transition disabled:opacity-50"
+              >
+                {isPaying ? "Đang xử lý..." : "Xác nhận đã thu"}
               </button>
             </div>
           </div>

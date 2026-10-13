@@ -82,13 +82,30 @@ export async function generateSalesReportExcel(
   let totalDuyen = 0;
   let totalBao25 = 0;
   let totalBao50 = 0;
+  let totalUnpaidRevenue = 0;
+  let totalUnpaidCount = 0;
 
   activeRecords.forEach((record, index) => {
     const qty = Number(record.quantity) || 0;
     const price = Number(record.totalPrice) || 0;
+    const isUnpaid = record.paymentStatus === "unpaid";
 
     totalQuantity += qty;
-    totalRevenue += price;
+
+    // CHỈ CỘNG VÀO TỔNG DOANH THU NẾU ĐƠN ĐÃ THU TIỀN!
+    if (!isUnpaid) {
+      totalRevenue += price;
+      if (record.seller === "Hằng") {
+        totalHang += price;
+      } else if (record.seller === "Gấm") {
+        totalGam += price;
+      } else if (record.seller === "Duyên") {
+        totalDuyen += price;
+      }
+    } else {
+      totalUnpaidRevenue += price;
+      totalUnpaidCount += 1;
+    }
 
     if (record.bagType === "25kg") {
       totalBao25 += qty;
@@ -96,15 +113,6 @@ export async function generateSalesReportExcel(
       totalBao50 += qty;
     }
 
-    if (record.seller === "Hằng") {
-      totalHang += price;
-    } else if (record.seller === "Gấm") {
-      totalGam += price;
-    } else if (record.seller === "Duyên") {
-      totalDuyen += price;
-    }
-
-    const isUnpaid = record.paymentStatus === "unpaid";
     const statusText = isUnpaid
       ? "Chưa thu"
       : record.paymentMethod === "transfer"
@@ -238,6 +246,13 @@ export async function generateSalesReportExcel(
   const bao50Row = salesSheet.addRow(["- Tổng số bao 50kg:", "", "", "", "", "", "", totalBao50, "", "", "", ""]);
   bao50Row.getCell(1).font = { name: "Arial", size: 10, italic: true };
   bao50Row.getCell(8).font = { name: "Arial", size: 10, bold: true };
+
+  if (totalUnpaidCount > 0) {
+    const unpaidRow = salesSheet.addRow([`- Đang chưa thu (${totalUnpaidCount} đơn):`, "", "", "", "", "", "", "", "", totalUnpaidRevenue, "", ""]);
+    unpaidRow.getCell(1).font = { name: "Arial", size: 10, italic: true, color: { argb: "FFDC2626" } };
+    unpaidRow.getCell(10).numFmt = '#,##0" đ"';
+    unpaidRow.getCell(10).font = { name: "Arial", size: 10, bold: true, color: { argb: "FFDC2626" } };
+  }
 
   salesSheet.columns = [
     { width: 8 },  // STT
